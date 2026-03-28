@@ -28,15 +28,15 @@ Jared is an **opinionated AGAAS framework** — a ready-to-deploy AI agent that 
 
 ## Key Features
 
-🪶 **Ultra-Lightweight**: Core agent logic < 2,000 lines. Just the essentials. No bloat.
-🧠 **Bun SQLite Memory**: Uses a robust native SQL memory system with `bun:sqlite` to manage Short-Term Context, Categorized Long-Term Memory (Facts, Preferences, Rules, Summaries), and Cherry-Pick Grep (search) capabilities.
-📉 **Native Token-Reduction Strategy**: Drastically reduces token consumption through intelligent context management and selective memory retrieval.
-🗺️ **Universal Routing**: Jared automatically handles OpenAI-compatible endpoints (Ollama, vLLM, OpenRouter) and applies native adapter patterns for providers with custom schemas (like Google Gemini).
-🔌 **MCP Support**: First-class Node.js implementation of Model Context Protocol for seamless tool extraction from stdio/SSE servers.
-🌐 **Web Search & Fetch**: Built-in Brave Search integration and URL content extraction — no external dependencies.
-🎯 **Markdown Skills**: Dynamic skill system inspired by Nanobot/OpenClaw — extend Jared by dropping a `SKILL.md` file into `src/skills/`.
-🔒 **Exec Guard**: Three-layer security for shell commands — allowlist, blocklist, and user confirmation mode.
-🏗️ **Workspace Sandboxing**: Restrict agent operations to a dedicated workspace directory with path traversal protection.
+- 🪶 **Ultra-Lightweight**: Core agent logic < 2,000 lines. Just the essentials. No bloat.
+- 🧠 **Bun SQLite Memory**: Uses a robust native SQL memory system with `bun:sqlite` to manage Short-Term Context, Categorized Long-Term Memory (Facts, Preferences, Rules, Summaries), and Cherry-Pick Grep (search) capabilities.
+- 📉 **Native Token-Reduction Strategy**: Drastically reduces token consumption through intelligent context management and selective memory retrieval.
+- 🗺️ **Universal Routing**: Jared automatically handles OpenAI-compatible endpoints (Ollama, vLLM, OpenRouter) and applies native adapter patterns for providers with custom schemas (like Google Gemini).
+- 🔌 **MCP Support**: First-class Node.js implementation of Model Context Protocol for seamless tool extraction from stdio/SSE servers.
+- 🌐 **Web Search & Fetch**: Built-in Brave Search integration and URL content extraction — no external dependencies.
+- 🎯 **Markdown Skills**: Dynamic skill system inspired by Nanobot/OpenClaw — extend Jared by dropping a `SKILL.md` file into `src/skills/`.
+- 🔒 **Exec Guard**: Three-layer security for shell commands — allowlist, blocklist, and user confirmation mode.
+- 🏗️ **Workspace Sandboxing**: Restrict agent operations to a dedicated workspace directory with path traversal protection.
 
 ## 💬 Supported Channels
 
@@ -541,12 +541,19 @@ jared/
 │   └── workspace/      # 🔒 Exec sandbox (when restrictToWorkspace is on)
 ├── src/
 │   ├── agent/          # 🧠 Core agent logic
+│   │   ├── agent.js    #    Agent manager (spinUp orchestrator)
 │   │   ├── loop.js     #    Agent loop (LLM ↔ tool execution)
 │   │   ├── context.js  #    Prompt builder
 │   │   ├── memory.js   #    Native bun:sqlite persistent memory
 │   │   ├── skills.js   #    Dynamic SKILL.md loader
-│   │   ├── exec-guard.js #  Exec security (allowlist/blocklist/confirm)
-│   │   └── subagent.js #    Isolated background task execution
+│   │   └── exec-guard.js #  Exec security (allowlist/blocklist/confirm)
+│   ├── tools/          # 🔧 Built-in tool implementations
+│   │   ├── exec.js     #    Shell command execution
+│   │   ├── cron.js     #    Cron job scheduling
+│   │   ├── memory.js   #    Memory search/add/remove
+│   │   ├── message.js  #    Proactive messaging
+│   │   ├── spawn.js    #    Background subagent spawning
+│   │   └── web.js      #    Web search & fetch
 │   ├── skills/         # 🎯 Markdown-based skills (SKILL.md)
 │   │   ├── cron/       #    Reminders & scheduling
 │   │   ├── memory/     #    Memory management guide
