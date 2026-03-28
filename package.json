@@ -1,0 +1,30 @@
+{
+  "name": "jared",
+  "main": "src/cli/index.js",
+  "bin": {
+    "jared": "./src/cli/index.js"
+  },
+  "scripts": {
+    "cli": "bun run src/cli/index.js --help",
+    "onboard": "bun run src/cli/index.js onboard",
+    "jared": "bun run src/cli/index.js start",
+    "audit": "bun run src/cli/index.js audit",
+    "lines": "bash scripts/core_agent_lines.sh",
+    "reset-memory": "bash scripts/reset_memory.sh"
+  },
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "@slack/events-api": "^3.0.1",
+    "@slack/socket-mode": "^2.0.5",
+    "@slack/web-api": "^7.14.1",
+    "discord.js": "^14.25.1",
+    "mailparser": "^3.9.3",
+    "node-telegram-bot-api": "^0.67.0",
+    "nodemailer": "^8.0.1",
+    "openai": "^6.25.0",
+    "whatsapp-web.js": "^1.34.6"
+  }
+}

@@ -1,0 +1,7 @@
+# Ignore heavily code-golfed files from formatting to preserve LOC
+src/config/index.js
+src/cli/index.js
+src/agent/exec-guard.js
+src/agent/memory.js
+src/agent/skills.js
+src/channels/console.js
