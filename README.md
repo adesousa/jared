@@ -460,9 +460,13 @@ Jared ships with these built-in tools (no configuration needed):
 | `remove_memory` | Remove an outdated memory by ID                                                       |
 | `cron`          | Schedule reminders and recurring tasks (add/list/remove, cron expressions, timezones) |
 | `message`       | Send proactive messages to the user on any channel                                    |
-| `spawn`         | Spawn a background subagent for async tasks                                           |
+| `spawn`         | Spawn a background subagent for async tasks (supports configurable roles via `src/team/`) |
 | `web_search`    | Search the web via Brave Search API                                                   |
 | `web_fetch`     | Fetch and extract readable text from any URL                                          |
+
+### 🧑‍💻 The `team/` Folder (Subagent Roles)
+
+When using the `spawn` tool to trigger background tasks, Jared typically adopts its default personality. However, for specialized tasks, you can add Markdown files to the `src/team/` folder (e.g., `web_developer.md`, `data_analyst.md`). If the `spawn` tool is called with a specific `role` parameter, the background subagent will assume that specialized system prompt instead. This improves token efficiency and ensures the background agent focuses strictly on the specialized skill set.
 
 ## 🎯 Skills
 
@@ -570,7 +574,8 @@ jared/
 │   ├── mcp/            # 🔌 Model Context Protocol integrations
 │   ├── providers/      # 🤖 Universal LLM router
 │   ├── session/        # 💬 Conversation session tracking
-│   ├── templates/      # 📜 SOUL and agent guidelines
+│   ├── identity/       # 📜 SOUL and agent guidelines
+│   ├── team/           # 🧑‍💻 Specialized Subagent identities (e.g. web_developer.md)
 │   └── utils/          # 🛠️ Helper utilities
 ├── assets/             # 🖼️ Static assets (Jared Logo)
 └── scripts/            # 📜 Operations scripts (core_agent_lines.sh)

@@ -96,7 +96,7 @@ async function main() {
       const defaultSoul = path.resolve(
         process.cwd(),
         "src",
-        "templates",
+        "identity",
         "SOUL.md"
       );
       try {

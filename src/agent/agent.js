@@ -18,14 +18,23 @@ class AgentManager {
 
   async spinUp(taskDescription, options = {}) {
     // Handle backwards compatibility for spinUp(taskDescription, modelOverride, channel, userId, sessionId)
-    let opts = (typeof options === "string" || options === null) ? { modelOverride: arguments[1] || null, channel: arguments[2] || "default", userId: arguments[3] || "local_user", sessionId: arguments[4] || "session-1", isSubagent: false } : options;
-    const { modelOverride = null, channel = "default", userId = "local_user", sessionId = "session-1", isSubagent = false } = opts;
+    let opts = (typeof options === "string" || options === null) ? { modelOverride: arguments[1] || null, channel: arguments[2] || "default", userId: arguments[3] || "local_user", sessionId: arguments[4] || "session-1", isSubagent: false, role: null } : options;
+    const { modelOverride = null, channel = "default", userId = "local_user", sessionId = "session-1", isSubagent = false, role = null } = opts;
 
     const dbPath = this.config.memoryPath || path.join(process.cwd(), ".jared", "memory.db");
     const memory = new MemoryManager(dbPath);
     await memory.initialize();
     
-    const context = new ContextManager(memory, this.config.soulPath);
+    let customSoulPath = this.config.soulPath;
+    let isTeamRole = false;
+    
+    if (isSubagent && role) {
+      const safeRole = role.replace(/[^a-zA-Z0-9_-]/g, "");
+      customSoulPath = path.resolve(process.cwd(), "src", "team", `${safeRole}.md`);
+      isTeamRole = true;
+    }
+    
+    const context = new ContextManager(memory, customSoulPath, isTeamRole);
     
     const skills = new SkillsManager();
     const skillsDir = path.resolve(process.cwd(), "src", "skills");

@@ -100,20 +100,27 @@ class ExecGuard {
 
   _askUserConfirmation(command) {
     return new Promise(resolve => {
-      bus.emit("console:pause");
-      const rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stderr
-      });
-      process.stderr.write(
-        `\n🔒 [EXEC GUARD] Jared wants to run:\n   $ ${command}\n`
-      );
-      rl.question("   Allow? (y/n): ", answer => {
-        rl.close();
-        bus.emit("console:resume");
-        const a = answer.trim().toLowerCase();
-        resolve(a === "y" || a === "yes");
-      });
+      const payload = {
+        promptText: `\n🔒 [EXEC GUARD] Jared wants to run:\n   $ ${command}\n   Allow? (y/n): `,
+        handled: false,
+        callback: answer => {
+          const a = answer.trim().toLowerCase();
+          resolve(a === "y" || a === "yes");
+        }
+      };
+
+      bus.emit("console:question", payload);
+
+      if (!payload.handled) {
+        const rl = readline.createInterface({
+          input: process.stdin,
+          output: process.stderr
+        });
+        rl.question(payload.promptText, answer => {
+          rl.close();
+          payload.callback(answer);
+        });
+      }
     });
   }
 }

@@ -6,16 +6,17 @@ export default {
       type: "object",
       properties: {
         task: { type: "string", description: "The task for the subagent to complete" },
-        label: { type: "string", description: "Optional short label for display" }
+        label: { type: "string", description: "Optional short label for display" },
+        role: { type: "string", description: "Optional role for the subagent, mapping to a file in src/team (e.g. 'web_developer'). If omitted, defaults to general subagent." }
       },
       required: ["task"]
     }
   },
-  execute: async ({ task, label }, { agentManager, modelOverride, channel, userId, sessionId, bus }) => {
+  execute: async ({ task, label, role }, { agentManager, modelOverride, channel, userId, sessionId, bus }) => {
     const displayLabel = label || task.substring(0, 40);
     // Fire-and-forget: spawn a new subagent in the background
-    // Pass isSubagent flag to the spinUp method
-    agentManager.spinUp(task, { modelOverride, channel, userId, sessionId, isSubagent: true }).then(result => {
+    // Pass isSubagent flag and role to the spinUp method
+    agentManager.spinUp(task, { modelOverride, channel, userId, sessionId, isSubagent: true, role }).then(result => {
       bus.emit("message:send", {
         channel, userId, sessionId,
         content: `🔄 Background task "${displayLabel}" completed:\n${result.content}`

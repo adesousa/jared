@@ -78,7 +78,7 @@ class ConfigManager {
           allowedBins: ["curl", "gh", "summarize", "crontab", "echo", "cat", "grep", "head", "tail", "wc", "date", "uname", "whoami", "pwd", "ls", "find", "jq", "sort", "uniq", "awk", "sed", "tr", "npx", "node", "bun", "python3", "python", "git", "mkdir", "touch", "cp"]
         }
       },
-      soulPath: path.resolve(process.cwd(), "src/templates/SOUL.md"),
+      soulPath: path.resolve(process.cwd(), "src/identity/SOUL.md"),
       debug: false
     };
   }

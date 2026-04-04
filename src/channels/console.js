@@ -91,9 +91,16 @@ class ConsoleChannel {
       process.exit(0);
     });
 
-    // Coordinate with exec guard: pause readline so stdin doesn't leak
-    bus.on("console:pause", () => this.rl.pause());
-    bus.on("console:resume", () => this.rl.resume());
+    // Expose readline question prompt to other components (like ExecGuard) 
+    // to prevent double-echo bugs caused by multiple interfaces on process.stdin
+    bus.on("console:question", payload => {
+      payload.handled = true;
+      this.rl.question(payload.promptText, answer => {
+        payload.callback(answer);
+        // Ensure prompt looks crisp after returning control
+        this.rl.prompt();
+      });
+    });
   }
 }
 
