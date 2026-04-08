@@ -2,9 +2,9 @@
 
 🐈 **Jared** is your AI personal assistant. Think of it like the COO (Chief Organisational Officer) of your life/company.
 
-⚡️ Delivers core agent functionality in less than **2,000** lines of code.
+⚡️ Delivers core agent functionality in less than **3,000** lines of code.
 
-📏 Real-time line count: **1,897 lines** (run `bash scripts/core_agent_lines.sh` or `bun run lines` to verify anytime)
+📏 Real-time line count: **2,216 lines** (run `bash scripts/core_agent_lines.sh` or `bun run lines` to verify anytime)
 
 ## 🧬 Agentic as a Service (AGAAS)
 
@@ -24,11 +24,11 @@ Jared is an **opinionated AGAAS framework** — a ready-to-deploy AI agent that 
 1. **Agent, not assistant.** Jared doesn't wait passively — it monitors heartbeat tasks, triggers cron jobs, and delivers results to the right channel proactively.
 2. **Service, not CLI.** Run it once, connect your channels, and Jared stays alive — handling messages from any source, remembering context across sessions.
 3. **Opinionated, not configurable-to-death.** SQLite for memory (not a vector DB). Markdown for skills (not a plugin SDK). Event bus for routing (not a message queue). Every choice optimizes for simplicity and low token cost.
-4. **Ultra-lightweight by design.** The entire agent core fits in < 2,000 LOC. If you can read JavaScript, you can understand and customize every line.
+4. **Ultra-lightweight by design.** The entire agent core fits in < 3,000 LOC. If you can read JavaScript, you can understand and customize every line.
 
 ## Key Features
 
-- 🪶 **Ultra-Lightweight**: Core agent logic < 2,000 lines. Just the essentials. No bloat.
+- 🪶 **Ultra-Lightweight**: Core agent logic < 3,000 lines. Just the essentials. No bloat.
 - 🧠 **Bun SQLite Memory**: Uses a robust native SQL memory system with `bun:sqlite` to manage Short-Term Context, Categorized Long-Term Memory (Facts, Preferences, Rules, Summaries), and Cherry-Pick Grep (search) capabilities.
 - 📉 **Native Token-Reduction Strategy**: Drastically reduces token consumption through intelligent context management and selective memory retrieval.
 - 🗺️ **Universal Routing**: Jared automatically handles OpenAI-compatible endpoints (Ollama, vLLM, OpenRouter) and applies native adapter patterns for providers with custom schemas (like Google Gemini).
@@ -503,7 +503,7 @@ Instructions for the agent on how to use this skill...
 
 ## 💓 Heartbeat
 
-Jared checks `.jared/HEARTBEAT.md` every 30 seconds for recurring tasks. If active tasks are found, they are dispatched to the agent for processing.
+Jared checks `.jared/HEARTBEAT.md` periodically (default: 30 seconds, configurable via \`heartbeat.intervalMs\`) for recurring tasks. If active tasks are found, they are dispatched to the agent for processing.
 
 ```markdown
 ## Active Tasks
@@ -524,7 +524,7 @@ The agent can modify this file itself (via `exec`) to add, complete, or remove t
 | -------------------- | ----------------------------------------------------------------- |
 | `jared onboard`      | Initialize the agent and generate `.jared/config.json`            |
 | `jared start`        | Start Jared in interactive mode and connect configured channels   |
-| `jared lines`        | Check real-time codebase size (ensuring it stays under 2,000 LOC) |
+| `jared lines`        | Check real-time codebase size (ensuring it stays under 3,000 LOC) |
 | `jared reset-memory` | Completely wipe the agent's persistent memory database            |
 | `jared audit`        | Run dependency security audit (checks for known vulnerabilities)  |
 

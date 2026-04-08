@@ -61,6 +61,7 @@ class ConfigManager {
         openrouter: { url: "https://openrouter.ai/api/v1", keys: [{ name: "openrouter-key", value: "", models: [] }] }
       },
       agents: { defaults: { provider: "ollama", model: "qwen3:4b-instruct", maxIterations: 15 } },
+      heartbeat: { intervalMs: 30000 },
       mcp: { servers: {} },
       tools: { web: { search: { apiKey: "" } } },
       channels: {

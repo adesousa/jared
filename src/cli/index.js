@@ -117,7 +117,7 @@ async function main() {
     try {
       await fs.access(hbPath);
     } catch {
-      const hbTemplate = `# Heartbeat Tasks\n\nThis file is checked every 30 seconds by Jared.\nAdd tasks below that you want the agent to work on periodically.\n\n## Active Tasks\n\n<!-- Add your periodic tasks below this line -->\n\n\n## Completed\n\n<!-- Move completed tasks here or delete them -->\n`;
+      const hbTemplate = `# Heartbeat Schedule\n\n## One Shot Tasks\n\n## Daily Tasks\n### 6:45 AM — Morning Briefing\n- Check Google Calendar: list all events for today with times\n\n## Weekly Tasks\n### 5:00 PM Friday — Weekly Report\n- Pull this week's key metrics vs. last week\n\n## Monthly Tasks\n### 25th — Lead Alert\n- Check Accountability CRM\n`;
       await fs.writeFile(hbPath, hbTemplate, "utf8");
       console.log(`${G}✓${R} Created .jared/HEARTBEAT.md`);
     }
@@ -190,8 +190,9 @@ async function main() {
     } else { console.log(`  ${Y}⚠${R} No channels enabled`); }
 
     const cronCount = cronScheduler.jobs?.size || 0;
+    const heartbeatIntervalMs = config.heartbeat?.intervalMs || 30000;
     console.log(
-      `  ${G}✓${R} Cron: ${cronCount} job${cronCount !== 1 ? "s" : ""} | Heartbeat: 30s\n`
+      `  ${G}✓${R} Cron: ${cronCount} job${cronCount !== 1 ? "s" : ""} | Heartbeat: ${heartbeatIntervalMs / 1000}s\n`
     );
 
     // Debug mode from config
@@ -204,7 +205,7 @@ async function main() {
     startupSkills.loadSkillsFromDirectory(skillsDir);
 
     const heartbeatPath = path.join(process.cwd(), ".jared", "HEARTBEAT.md");
-    const heartbeat = new HeartbeatManager(heartbeatPath);
+    const heartbeat = new HeartbeatManager(heartbeatPath, heartbeatIntervalMs);
     heartbeat.start();
     const agentManager = new AgentManager(config);
 

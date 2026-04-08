@@ -40,11 +40,9 @@ class ContextManager {
     // Construct System Prompt
     const systemPrompt = `
 ${soulTemplate}
-
-## Core Memory (Loaded from SQLite instance):
+## Core Memory (Loaded from SQLite):
 ${coreMemories || "No core memory established yet."}
-
-You are an ultra-lightweight AI Assistant named Jared. Proceed with your designated tasks efficiently.
+Proceed with your designated tasks efficiently.
 You have native memory tools to optimize token consumption:
 - use "search_memory" to quickly cherry-pick grep your past conversations (short & long term) when the user references something you don't instantly remember.
 - use "add_memory" and "remove_memory" to curate the "Core Memory" section above. Update these dynamically whenever you learn something permanent about the user or project context. Ensure you select the appropriate \`category\`.

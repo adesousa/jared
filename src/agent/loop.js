@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import bus from "../bus/index.js";
 
 class AgentLoop extends EventEmitter {
   constructor(context, memory, skills, mcp, provider, maxIterations = 15) {
@@ -19,6 +20,7 @@ class AgentLoop extends EventEmitter {
     onToken = null
   ) {
     this.isRunning = true;
+    bus.emit("task:start");
     const tokenUsage = { promptTokens: 0, completionTokens: 0 };
     try {
       // Basic event loop placeholder
@@ -48,6 +50,7 @@ class AgentLoop extends EventEmitter {
         // Handle tool calls
         messages.push(response.message);
         for (const toolCall of response.tool_calls) {
+          bus.emit("tool:start", { name: toolCall.function.name });
           let result;
           if (this.mcp.hasTool(toolCall.function.name)) {
             result = await this.mcp.executeTool(
