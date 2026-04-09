@@ -33,9 +33,26 @@ class ContextManager {
     return this.soulCache;
   }
 
+  async getTeamContext() {
+    try {
+      const teamDir = path.join(process.cwd(), "src", "team");
+      const files = await fs.readdir(teamDir);
+      const roles = files
+        .filter(f => f.endsWith(".md"))
+        .map(f => f.replace(".md", ""));
+      if (roles.length > 0) {
+        return `\n## Available Team Members (Subagents)\nYou can use the "spawn" tool to delegate tasks to subagents. Available roles: ${roles.join(", ")}\n`;
+      }
+    } catch {
+      // Ignore if directory doesn't exist
+    }
+    return "";
+  }
+
   async buildPrompt(taskRequest, session_id, user_id, skillsContext = "") {
     const soulTemplate = await this.loadSoul();
     const coreMemories = await this.memoryManager.getCoreMemories(user_id);
+    const teamContext = await this.getTeamContext();
 
     // Construct System Prompt
     const systemPrompt = `
@@ -48,7 +65,7 @@ You have native memory tools to optimize token consumption:
 - use "add_memory" and "remove_memory" to curate the "Core Memory" section above. Update these dynamically whenever you learn something permanent about the user or project context. Ensure you select the appropriate \`category\`.
 - use "exec" to execute shell commands when needed by your skills.
 - use "web_search" and "web_fetch" to look up real-time information, news, or fetch content from links.
-${skillsContext}
+${teamContext}${skillsContext}
     `.trim();
 
     const history = await this.memoryManager.getRecentContext(session_id);

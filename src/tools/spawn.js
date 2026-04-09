@@ -14,19 +14,30 @@ export default {
   },
   execute: async ({ task, label, role }, { agentManager, modelOverride, channel, userId, sessionId, bus }) => {
     const displayLabel = label || task.substring(0, 40);
+    
+    bus.emit("subagent:start", { channel, sessionId });
+
+    const formatRole = (r) => {
+      if (!r) return "Subagent";
+      return r.split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    };
+    const roleStr = formatRole(role);
+
     // Fire-and-forget: spawn a new subagent in the background
     // Pass isSubagent flag and role to the spinUp method
     agentManager.spinUp(task, { modelOverride, channel, userId, sessionId, isSubagent: true, role }).then(result => {
+      bus.emit("subagent:end", { channel, sessionId });
       bus.emit("message:send", {
         channel, userId, sessionId,
-        content: `🔄 Background task "${displayLabel}" completed:\n${result.content}`
+        content: `🔄 Background task "${displayLabel}" completed by \`${roleStr}\`:\n${result.content}`
       });
     }).catch(err => {
+      bus.emit("subagent:end", { channel, sessionId });
       bus.emit("message:send", {
         channel, userId, sessionId,
-        content: `❌ Background task "${displayLabel}" failed: ${err.message}`
+        content: `❌ Background task "${displayLabel}" by \`${roleStr}\` failed: ${err.message}`
       });
     });
-    return `Spawned background task: "${displayLabel}". Results will be delivered when complete.`;
+    return `Spawned background task: "${displayLabel}" for \`${roleStr}\`. Results will be delivered when complete.`;
   }
 };

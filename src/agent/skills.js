@@ -80,10 +80,10 @@ class SkillsManager {
     if (this.skillInstructions.length === 0) return "";
 
     const sections = this.skillInstructions.map(skill => {
-      return `### Skill: ${skill.name}\n${skill.description ? `> ${skill.description}\n` : ""}\n${skill.instructions}`;
+      return `- **${skill.name}**: ${skill.description ? skill.description : "No description available."}`;
     });
 
-    return `\n## Available Skills\n\nYou have the following skills available. Use the \`exec\` tool to execute any shell commands described in these skills.\n\n${sections.join("\n\n---\n\n")}`;
+    return `\n## Available Skills\nYou have the following skills available. Use the \`read_skill_manual\` tool to read the full instructions for any of these skills before using them:\n${sections.join("\n")}\n`;
   }
 
   // Scan a directory for JS files containing tool exports

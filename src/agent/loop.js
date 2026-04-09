@@ -71,7 +71,9 @@ class AgentLoop extends EventEmitter {
           });
         }
       }
-      throw new Error("Max iterations reached without completion.");
+      const fallbackContent = "I have reached the maximum number of iterations allowed for this task without completing it. Please try refining your request or breaking it down into smaller steps.";
+      this.emit("taskCompleted", fallbackContent);
+      return { content: fallbackContent, usage: tokenUsage };
     } catch (error) {
       this.emit("error", error);
       throw error;

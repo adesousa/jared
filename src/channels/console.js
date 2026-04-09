@@ -210,6 +210,8 @@ class ConsoleChannel {
     this.spinnerInterval = null;
     this.spinnerFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
     this.spinnerFrameIdx = 0;
+    this.activeSubagents = 0;
+    this.spinnerText = null;
   }
 
   startSpinner(text = "Thinking...") {
@@ -231,6 +233,21 @@ class ConsoleChannel {
     }
   }
 
+  updatePrompt() {
+    if (!this.rl) return;
+    const defaultPrompt = `${PURPLE}❯ ${RESET}`;
+    if (this.activeSubagents > 0) {
+      const taskWord = this.activeSubagents === 1 ? 'task' : 'tasks';
+      this.rl.setPrompt(`${DIM}(${this.activeSubagents} active ${taskWord})${RESET} ${defaultPrompt}`);
+    } else {
+      this.rl.setPrompt(defaultPrompt);
+    }
+    // Only refresh if we are currently sitting at the prompt
+    if (!this.isStreaming && !this.spinnerInterval) {
+      this.rl.prompt(true);
+    }
+  }
+
   start() {
     if (!this.enabled) return;
 
@@ -243,15 +260,33 @@ class ConsoleChannel {
     console.log(BANNER);
     this.rl.prompt();
 
+    bus.on("subagent:start", payload => {
+      if (payload.channel === "console") {
+        this.activeSubagents++;
+        this.updatePrompt();
+      }
+    });
+
+    bus.on("subagent:end", payload => {
+      if (payload.channel === "console") {
+        this.activeSubagents = Math.max(0, this.activeSubagents - 1);
+        this.updatePrompt();
+      }
+    });
+
     bus.on("task:start", () => {
       console.log();
       this.startSpinner("Thinking...");
     });
 
     bus.on("tool:start", payload => {
-      if (this.isStreaming) return;
       this.stopSpinner();
-      console.log(`   ${DIM}[Working] Executing tool: ${payload.name}...${RESET}`);
+      if (this.isStreaming) {
+        this.lexer.flush();
+        process.stdout.write(`\n\n   ${DIM}[Working] Executing tool: ${payload.name}...${RESET}\n\n`);
+      } else {
+        console.log(`   ${DIM}[Working] Executing tool: ${payload.name}...${RESET}`);
+      }
       this.startSpinner("Working...");
     });
 

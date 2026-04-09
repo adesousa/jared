@@ -463,14 +463,18 @@ Jared ships with these built-in tools (no configuration needed):
 | `spawn`         | Spawn a background subagent for async tasks (supports configurable roles via `src/team/`) |
 | `web_search`    | Search the web via Brave Search API                                                   |
 | `web_fetch`     | Fetch and extract readable text from any URL                                          |
+| `heartbeat`     | Manage the HEARTBEAT.md schedule (One Shot, Daily, Weekly, Monthly)                   |
+| `read_skill_manual` | Read the full markdown instructions from a skill so the agent knows how to use it |
 
 ### 🧑‍💻 The `team/` Folder (Subagent Roles)
 
-When using the `spawn` tool to trigger background tasks, Jared typically adopts its default personality. However, for specialized tasks, you can add Markdown files to the `src/team/` folder (e.g., `web_developer.md`, `data_analyst.md`). If the `spawn` tool is called with a specific `role` parameter, the background subagent will assume that specialized system prompt instead. This improves token efficiency and ensures the background agent focuses strictly on the specialized skill set.
+When using the `spawn` tool to trigger background tasks, Jared typically adopts its default personality. However, for specialized tasks, you can add Markdown files to the `src/team/` folder (e.g., `web_developer.md`, `data_analyst.md`). If the `spawn` tool is called with a specific `role` parameter, the background subagent will assume that specialized system prompt instead. 
+
+**Dynamic Awareness:** Jared automatically detects files in the `src/team/` directory and injects their names into his system prompt. This gives him dynamic awareness of all available team members so he can proactively assign tasks to them without overloading context.
 
 ## 🎯 Skills
 
-Jared uses a **Markdown-based skill system** inspired by the Nanobot/OpenClaw architecture. Skills are `SKILL.md` files with YAML frontmatter that get dynamically loaded into the agent's context.
+Jared uses a **Markdown-based skill system** inspired by the Nanobot/OpenClaw architecture. Skills are `SKILL.md` files with YAML frontmatter. To keep context extremely lightweight, only the `name` and `description` of each skill are loaded into the main agent prompt. If Jared needs to use a skill, he uses the `read_skill_manual` tool to dynamically load the exact instructions for that turn.
 
 ### Built-in Skills
 
@@ -503,20 +507,27 @@ Instructions for the agent on how to use this skill...
 
 ## 💓 Heartbeat
 
-Jared checks `.jared/HEARTBEAT.md` periodically (default: 30 seconds, configurable via \`heartbeat.intervalMs\`) for recurring tasks. If active tasks are found, they are dispatched to the agent for processing.
+Jared checks `.jared/HEARTBEAT.md` periodically (default: 30 seconds, configurable via `heartbeat.intervalMs`) for structured tasks. If active tasks are due, they are dispatched to the agent for processing.
 
 ```markdown
-## Active Tasks
+## One Shot Tasks
+### 3:00 PM — Setup Repo
+- Clone the repository and install dependencies
 
-- Check if any cron jobs failed and report
-- Remind me to take a break every hour
+## Daily Tasks
+### 9:00 AM — Morning Briefing
+- Summarize schedule and emails
 
-## Completed
+## Weekly Tasks
+### 5:00 PM Friday — Weekly Report
+- Generate the weekly wrap-up report
 
-- Cleaned up temp files
+## Monthly Tasks
+### 1st — Billing Review
+- Check API usage and billing
 ```
 
-The agent can modify this file itself (via `exec`) to add, complete, or remove tasks. For one-time reminders, use the `cron` tool instead.
+The agent can manage these tasks directly using the `heartbeat` tool (actions: add, remove, list). `One Shot Tasks` are automatically removed after they are executed. You can still use the `cron` tool for simpler one-off reminders.
 
 ## CLI Reference
 
@@ -557,7 +568,8 @@ jared/
 │   │   ├── memory.js   #    Memory search/add/remove
 │   │   ├── message.js  #    Proactive messaging
 │   │   ├── spawn.js    #    Background subagent spawning
-│   │   └── web.js      #    Web search & fetch
+│   │   ├── web.js      #    Web search & fetch
+│   │   └── read_skill_manual.js # Loading markdown skill context
 │   ├── skills/         # 🎯 Markdown-based skills (SKILL.md)
 │   │   ├── cron/       #    Reminders & scheduling
 │   │   ├── memory/     #    Memory management guide
