@@ -4,7 +4,7 @@
 
 ⚡️ Delivers core agent functionality in less than **3,000** lines of code.
 
-📏 Real-time line count: **2,216 lines** (run `bash scripts/core_agent_lines.sh` or `bun run lines` to verify anytime)
+📏 Real-time line count: **2,625 lines** (run `bash scripts/core_agent_lines.sh` or `bun run lines` to verify anytime)
 
 ## 🧬 Agentic as a Service (AGAAS)
 
@@ -452,23 +452,23 @@ jared start
 
 Jared ships with these built-in tools (no configuration needed):
 
-| Tool            | Description                                                                           |
-| --------------- | ------------------------------------------------------------------------------------- |
-| `exec`          | Execute shell commands (secured by [Exec Guard](./SECURITY.md))                       |
-| `search_memory` | Search past conversation history by keyword                                           |
-| `add_memory`    | Save a long-term memory (fact, preference, rule, summary)                             |
-| `remove_memory` | Remove an outdated memory by ID                                                       |
-| `cron`          | Schedule reminders and recurring tasks (add/list/remove, cron expressions, timezones) |
-| `message`       | Send proactive messages to the user on any channel                                    |
-| `spawn`         | Spawn a background subagent for async tasks (supports configurable roles via `src/team/`) |
-| `web_search`    | Search the web via Brave Search API                                                   |
-| `web_fetch`     | Fetch and extract readable text from any URL                                          |
-| `heartbeat`     | Manage the HEARTBEAT.md schedule (One Shot, Daily, Weekly, Monthly)                   |
-| `read_skill_manual` | Read the full markdown instructions from a skill so the agent knows how to use it |
+| Tool                | Description                                                                               |
+| ------------------- | ----------------------------------------------------------------------------------------- |
+| `exec`              | Execute shell commands (secured by [Exec Guard](./SECURITY.md))                           |
+| `search_memory`     | Search past conversation history by keyword                                               |
+| `add_memory`        | Save a long-term memory (fact, preference, rule, summary)                                 |
+| `remove_memory`     | Remove an outdated memory by ID                                                           |
+| `cron`              | Schedule reminders and recurring tasks (add/list/remove, cron expressions, timezones)     |
+| `message`           | Send proactive messages to the user on any channel                                        |
+| `spawn`             | Spawn a background subagent for async tasks (supports configurable roles via `src/team/`) |
+| `web_search`        | Search the web via Brave Search API                                                       |
+| `web_fetch`         | Fetch and extract readable text from any URL                                              |
+| `heartbeat`         | Manage the HEARTBEAT.md schedule (One Shot, Daily, Weekly, Monthly)                       |
+| `read_skill_manual` | Read the full markdown instructions from a skill so the agent knows how to use it         |
 
 ### 🧑‍💻 The `team/` Folder (Subagent Roles)
 
-When using the `spawn` tool to trigger background tasks, Jared typically adopts its default personality. However, for specialized tasks, you can add Markdown files to the `src/team/` folder (e.g., `web_developer.md`, `data_analyst.md`). If the `spawn` tool is called with a specific `role` parameter, the background subagent will assume that specialized system prompt instead. 
+When using the `spawn` tool to trigger background tasks, Jared typically adopts its default personality. However, for specialized tasks, you can add Markdown files to the `src/team/` folder (e.g., `web_developer.md`, `data_analyst.md`). If the `spawn` tool is called with a specific `role` parameter, the background subagent will assume that specialized system prompt instead.
 
 **Dynamic Awareness:** Jared automatically detects files in the `src/team/` directory and injects their names into his system prompt. This gives him dynamic awareness of all available team members so he can proactively assign tasks to them without overloading context.
 
@@ -511,19 +511,27 @@ Jared checks `.jared/HEARTBEAT.md` periodically (default: 30 seconds, configurab
 
 ```markdown
 ## One Shot Tasks
+
 ### 3:00 PM — Setup Repo
+
 - Clone the repository and install dependencies
 
 ## Daily Tasks
+
 ### 9:00 AM — Morning Briefing
+
 - Summarize schedule and emails
 
 ## Weekly Tasks
+
 ### 5:00 PM Friday — Weekly Report
+
 - Generate the weekly wrap-up report
 
 ## Monthly Tasks
+
 ### 1st — Billing Review
+
 - Check API usage and billing
 ```
 

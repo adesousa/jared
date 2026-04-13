@@ -63,7 +63,7 @@ Proceed with your designated tasks efficiently.
 You have native memory tools to optimize token consumption:
 - use "search_memory" to quickly cherry-pick grep your past conversations (short & long term) when the user references something you don't instantly remember.
 - use "add_memory" and "remove_memory" to curate the "Core Memory" section above. Update these dynamically whenever you learn something permanent about the user or project context. Ensure you select the appropriate \`category\`.
-- use "exec" to execute shell commands when needed by your skills.
+- use "exec" to execute shell commands when needed by your skills. If restricted to a workspace, your current working directory is the root of your workspace and you cannot traverse above it.
 - use "web_search" and "web_fetch" to look up real-time information, news, or fetch content from links.
 ${teamContext}${skillsContext}
     `.trim();

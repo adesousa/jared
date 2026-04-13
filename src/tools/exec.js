@@ -1,7 +1,7 @@
 export default {
   schema: {
     name: "exec",
-    description: "Execute a shell command and return stdout.",
+    description: "Execute a shell command and return stdout. IMPORTANT: If restricted to a workspace sandbox, your current directory is the root of your workspace. Do not attempt to use absolute paths outside of it or traverse up.",
     parameters: {
       type: "object",
       properties: {

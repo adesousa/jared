@@ -10,7 +10,7 @@ export default {
       properties: {
         action: { type: "string", enum: ["add", "remove", "list"] },
         category: { type: "string", enum: ["One Shot Tasks", "Daily Tasks", "Weekly Tasks", "Monthly Tasks"] },
-        time_spec: { type: "string", description: "e.g. '8:15 AM', '5:00 PM Friday', '25th'" },
+        time_spec: { type: "string", description: "MUST be absolute clock time (e.g. '8:15 AM', '5:00 PM Friday', '25th'). DO NOT use relative times like 'in 2 minutes' - calculate the real time first." },
         title: { type: "string", description: "Title of the task to add or remove" },
         task_description: { type: "string", description: "Actionable description of the task (for add action)" }
       },
@@ -35,6 +35,28 @@ export default {
            return "Error: category, time_spec, title, and task_description required for add.";
        }
        
+       let parsedTimeSpec = time_spec;
+       const relativeMinMatch = time_spec.match(/^(?:in\s+)?(\d+)\s*min(?:ute)?s?/i);
+       const relativeHourMatch = time_spec.match(/^(?:in\s+)?(\d+)\s*hour(?:s)?/i);
+
+       if (relativeMinMatch) {
+           const mins = parseInt(relativeMinMatch[1], 10);
+           const targetDate = new Date(Date.now() + mins * 60000);
+           let h = targetDate.getHours();
+           let m = targetDate.getMinutes().toString().padStart(2, '0');
+           let ampm = h >= 12 ? 'PM' : 'AM';
+           let dispH = h % 12 || 12;
+           parsedTimeSpec = `${dispH}:${m} ${ampm}`;
+       } else if (relativeHourMatch) {
+           const hours = parseInt(relativeHourMatch[1], 10);
+           const targetDate = new Date(Date.now() + hours * 3600000);
+           let h = targetDate.getHours();
+           let m = targetDate.getMinutes().toString().padStart(2, '0');
+           let ampm = h >= 12 ? 'PM' : 'AM';
+           let dispH = h % 12 || 12;
+           parsedTimeSpec = `${dispH}:${m} ${ampm}`;
+       }
+       
        let rewritten = [];
        let inCategory = false;
        let added = false;
@@ -45,7 +67,7 @@ export default {
                rewritten.push(lines[i]);
            } else if (lines[i].startsWith('## ')) {
                if (inCategory && !added) {
-                   rewritten.push(`### ${time_spec} — ${title}`);
+                   rewritten.push(`### ${parsedTimeSpec} — ${title}`);
                    rewritten.push(`- ${task_description}`);
                    added = true;
                }
@@ -57,14 +79,14 @@ export default {
        }
        
        if (inCategory && !added) {
-           rewritten.push(`### ${time_spec} — ${title}`);
+           rewritten.push(`### ${parsedTimeSpec} — ${title}`);
            rewritten.push(`- ${task_description}`);
            added = true;
        }
        
        if (!added) {
            rewritten.push(`## ${category}`);
-           rewritten.push(`### ${time_spec} — ${title}`);
+           rewritten.push(`### ${parsedTimeSpec} — ${title}`);
            rewritten.push(`- ${task_description}`);
        }
        
