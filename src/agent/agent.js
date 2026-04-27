@@ -49,20 +49,23 @@ class AgentManager {
     }
     const execGuard = new ExecGuard(securityConfig);
 
+    // Initialize MCP early to make it available to dynamic tools
+    const mcp = new MCPManager(this.config.mcp);
+    await mcp.initialize();
+
     // Dynamic Tool Loading
     const toolsDir = path.resolve(process.cwd(), "src", "tools");
-    const runtimeContext = { config: this.config, memory, userId, sessionId, channel, execGuard, cronScheduler, bus, agentManager: this };
+    const runtimeContext = { config: this.config, memory, userId, sessionId, channel, execGuard, cronScheduler, bus, agentManager: this, mcp };
     
     await skills.loadToolsFromDirectory(toolsDir, runtimeContext, true);
 
     // === Run agent loop ===
-    const mcp = new MCPManager(this.config.mcp);
-    await mcp.initialize();
     
     const provider = new ProviderRouter(this.config);
     if (modelOverride) provider.setModel(modelOverride);
     
     let skillsContext = skills.getSkillsContext();
+    let mcpContext = mcp.getMCPContext();
     
     let maxIterations = this.config.agents?.defaults?.maxIterations || 15;
     let actualTaskDescription = taskDescription;
@@ -78,13 +81,17 @@ class AgentManager {
       bus.emit("message:stream", { channel, userId, sessionId, token });
     } : null;
 
-    const result = await agentLoop.runTask(actualTaskDescription, sessionId, userId, skillsContext, onToken);
+    const result = await agentLoop.runTask(actualTaskDescription, sessionId, userId, skillsContext, mcpContext, onToken);
     const responseContent = typeof result.content === "string" ? result.content : JSON.stringify(result.content);
     const tokenUsage = result.usage;
     
     if (!isSubagent) {
       await memory.addMessage(sessionId, "user", taskDescription);
       await memory.addMessage(sessionId, "assistant", responseContent);
+    }
+    
+    if (tokenUsage && (tokenUsage.promptTokens > 0 || tokenUsage.completionTokens > 0)) {
+      await memory.addTokenUsage(sessionId, provider.activeProviderName || "unknown", provider.model || "unknown", tokenUsage.promptTokens, tokenUsage.completionTokens);
     }
     
     return { content: responseContent, usage: tokenUsage };

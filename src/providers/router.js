@@ -4,6 +4,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 class ProviderRouter {
   constructor(config = {}) {
     this.activeProviderName = config.agents?.defaults?.provider;
+    this.thinking = config.agents?.defaults?.thinking ?? true;
+    
     const activeProvider = this.activeProviderName
       ? config.providers?.[this.activeProviderName]
       : null;
@@ -37,6 +39,9 @@ class ProviderRouter {
       params.tools = tools;
       params.tool_choice = "auto";
     }
+    params.extra_body = {
+      chat_template_kwargs: { enable_thinking: this.thinking }
+    };
 
     if (!onToken) {
       const response = await this.openai.chat.completions.create(params);

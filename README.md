@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="src/assets/jared.jpg" width="400" alt="Jared Logo">
+</p>
+
 # Jared: The AI COO
 
 🐈 **Jared** is your AI personal assistant. Think of it like the COO (Chief Organisational Officer) of your life/company.
@@ -305,6 +309,7 @@ Set your default provider and active model:
     "defaults": {
       "provider": "ollama",
       "model": "glm-4.6:cloud",
+      "thinking": false,
       "maxIterations": 15
     }
   }
@@ -314,6 +319,7 @@ Set your default provider and active model:
 | Field           | Description                                                        | Default         |
 | --------------- | ------------------------------------------------------------------ | --------------- |
 | `provider`      | The default LLM provider to use                                    | `ollama`        |
+| `thinking`      | Enable reasoning `<think>` blocks                                  | `true`          |
 | `model`         | The active model for the provider                                  | `glm-4.6:cloud` |
 | `maxIterations` | Max tool-use loops per message (prevents infinite loops/runaway $) | `15`            |
 
@@ -425,20 +431,30 @@ Jared supports [MCP](https://modelcontextprotocol.io/) — connect external tool
         ]
       },
       "my-remote-mcp": {
-        "url": "https://example.com/mcp/",
+        "type": "url",
+        "url": "https://example.com/mcp/sse",
         "headers": {
           "Authorization": "Bearer xxxxx"
         }
+      },
+      "my-streamable-mcp": {
+        "type": "url",
+        "transport": "streamable",
+        "url": "https://example.com/mcp",
+        "enabled": false
       }
     }
   }
 }
 ```
 
-| Mode         | Config                       | Example                         |
-| ------------ | ---------------------------- | ------------------------------- |
-| **Stdio**    | `command` + `args`           | Local process via `npx` / `uvx` |
-| **HTTP/SSE** | `url` + `headers` (optional) | Remote endpoint                 |
+| Mode                 | Config                                                 | Example                         |
+| -------------------- | ------------------------------------------------------ | ------------------------------- |
+| **Stdio**            | `command` + `args`                                     | Local process via `npx` / `uvx` |
+| **HTTP/SSE**         | `type: "url"` + `url` + `headers` (optional)           | Remote endpoint                 |
+| **Streamable HTTP**  | `type: "url"` + `transport: "streamable"` + `url`      | Modern remote endpoint          |
+
+> **Pro-Tip**: You can add `"enabled": false` to any MCP server configuration to temporarily disable it and prevent its tools from injecting into Jared's context, without having to delete the config entirely.
 
 MCP tools are automatically discovered and registered on startup. The LLM can use them alongside built-in tools — no extra configuration needed.
 

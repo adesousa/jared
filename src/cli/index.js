@@ -152,7 +152,7 @@ async function main() {
     process.exit(0);
   }
 
-  if (["audit", "lines", "reset-memory"].includes(command)) {
+  if (["audit", "lines", "reset-memory", "stats"].includes(command)) {
     try {
       const { execSync } = await import("node:child_process");
       const cwd = process.cwd();
@@ -163,7 +163,46 @@ async function main() {
           if (err.status && err.status > 0) { console.log("\n⚠️  Vulnerabilities found. Run 'npm audit fix' to resolve."); }
         }
       } else if (command === "lines") { execSync("bash scripts/core_agent_lines.sh", { cwd, stdio: "inherit" });
-      } else if (command === "reset-memory") { execSync("bash scripts/reset_memory.sh", { cwd, stdio: "inherit" }); }
+      } else if (command === "reset-memory") { execSync("bash scripts/reset_memory.sh", { cwd, stdio: "inherit" });
+      } else if (command === "stats") {
+        const MemoryManager = (await import("../agent/memory.js")).default;
+        const memory = new MemoryManager(path.join(cwd, ".jared", "memory.db"));
+        await memory.initialize();
+        const stats = await memory.getStats();
+
+        const P = "\x1b[38;5;141m", B = "\x1b[1m", D = "\x1b[2m", R = "\x1b[0m", C = "\x1b[36m", Y = "\x1b[33m";
+        console.log(`\n${P}${B}╔════════════════════════════════════════════╗${R}`);
+        console.log(`${P}${B}║             🧠 JARED CORE STATS            ║${R}`);
+        console.log(`${P}${B}╚════════════════════════════════════════════╝${R}\n`);
+
+        const formatNumber = num => new Intl.NumberFormat().format(num);
+        
+        console.log(`${D}Overall Usage${R}`);
+        console.log(`${B}Input Tokens:   ${C}${formatNumber(stats.total.prompt)}${R}`);
+        console.log(`${B}Output Tokens:  ${Y}${formatNumber(stats.total.completion)}${R}`);
+        console.log(`${B}Total Tokens:   ${P}${formatNumber(stats.total.prompt + stats.total.completion)}${R}\n`);
+
+        if (stats.byModel && stats.byModel.length > 0) {
+          console.log(`${D}Usage by Model${R}`);
+          const maxModelLen = Math.max(...stats.byModel.map(m => m.model.length), 20);
+          stats.byModel.forEach(m => {
+            const mTotal = m.prompt + m.completion;
+            const barLength = Math.max(1, Math.floor((mTotal / (stats.total.prompt + stats.total.completion)) * 20));
+            const bar = '█'.repeat(barLength) + '░'.repeat(20 - barLength);
+            console.log(`  ${B}${m.model.padEnd(maxModelLen)}${R} [${P}${bar}${R}] ${formatNumber(mTotal)}`);
+          });
+          console.log("");
+        }
+
+        const jokes = [
+          "You're burning through tokens like Pied Piper burned through cash...",
+          "I hope this was expensed...",
+          "This guy f***s up your API limits.",
+          "My cloud compute bill is going to be spectacular.",
+          "Another day, another million tokens."
+        ];
+        console.log(`${D}"${jokes[Math.floor(Math.random() * jokes.length)]}" - Jared Dunn${R}\n`);
+      }
     } catch (e) {
       console.error(`${command} failed:`, e.message);
     }
@@ -180,7 +219,8 @@ async function main() {
 
     // Channel status check at startup
     const provider = config.agents?.defaults?.provider || "unknown";
-    const model = config.agents?.defaults?.model || "unknown";
+    const activeProvider = config.providers?.[provider];
+    const model = config.agents?.defaults?.model || activeProvider?.keys?.[0]?.models?.[0] || "unknown";
     console.log(
       `${D}  Provider: ${R}${P}${provider}${R} ${D}| Model: ${R}${P}${model}${R}`
     );
@@ -240,7 +280,7 @@ async function main() {
     });
 
     bus.on("heartbeat", async ({ tasks }) => {
-      const prompt = `[Heartbeat] Execute these recurring tasks:\n${tasks.map(t => `- ${t}`).join("\n")}`;
+      const prompt = `[System Trigger] The following scheduled tasks are due NOW:\n${tasks.map(t => `- ${t}`).join("\n")}\n\nYour job is to strictly perform the action or immediately remind the user. Do not schedule them again using tools.`;
       try {
         const result = await agentManager.spinUp(
           prompt,

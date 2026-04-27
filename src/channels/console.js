@@ -1,6 +1,7 @@
 import readline from "node:readline";
 import bus from "../bus/index.js";
 import sessionManager from "../session/index.js";
+import { logger } from "../utils/index.js";
 
 const PURPLE = "\x1b[38;5;141m";
 const WHITE = "\x1b[97m";
@@ -17,8 +18,9 @@ class StreamMarkdownLexer {
     this.buffer = '';
     this.isBold = false;
     this.isItalic = false;
-    this.isCode = false;
     this.isCodeBlock = false;
+    this.inTable = false;
+    this.tableLines = [];
     
     // ANSI formatters
     this.fmt = {
@@ -43,6 +45,8 @@ class StreamMarkdownLexer {
      this.isCode = false;
      this.isCodeBlock = false;
      this.atLineStart = true;
+     this.inTable = false;
+     this.tableLines = [];
   }
 
   getStateFmt() {
@@ -65,6 +69,36 @@ class StreamMarkdownLexer {
     while (i < this.buffer.length) {
       const char = this.buffer[i];
       const nextChar = this.buffer[i + 1];
+
+      // ------ Table Buffering Logic ------
+      if (this.atLineStart && !this.isCodeBlock) {
+         let p = i;
+         while (p < this.buffer.length && this.buffer[p] === ' ') p++;
+         
+         if (p === this.buffer.length) {
+             break;
+         }
+         
+         if (this.buffer[p] === '|') {
+            let nlIndex = this.buffer.indexOf('\n', p);
+            if (nlIndex === -1) {
+               break; 
+            }
+            
+            this.inTable = true;
+            const rowStr = this.buffer.slice(i, nlIndex + 1);
+            this.tableLines.push(rowStr);
+            i = nlIndex + 1;
+            continue; 
+         } else {
+            if (this.inTable) {
+               out += this.formatTable(this.tableLines);
+               this.tableLines = [];
+               this.inTable = false;
+            }
+         }
+      }
+      // -----------------------------------
 
       if (char === '\n') {
          out += this.fmt.reset + char;
@@ -194,9 +228,90 @@ class StreamMarkdownLexer {
 
   flush() {
     if (this.buffer) {
-       this.write(this.buffer);
+       let trimmed = this.buffer.trimStart();
+       if (this.inTable || (this.atLineStart && trimmed.startsWith('|'))) {
+           this.tableLines.push(this.buffer);
+           this.write(this.formatTable(this.tableLines));
+           this.inTable = false;
+           this.tableLines = [];
+       } else {
+           if (this.inTable) {
+               this.write(this.formatTable(this.tableLines));
+               this.inTable = false;
+               this.tableLines = [];
+           }
+           this.write(this.buffer);
+       }
        this.buffer = '';
+    } else if (this.inTable && this.tableLines.length > 0) {
+       this.write(this.formatTable(this.tableLines));
+       this.inTable = false;
+       this.tableLines = [];
     }
+  }
+
+  formatTable(lines) {
+     const rows = [];
+     let maxCols = 0;
+     for (const line of lines) {
+        let trimmed = line.trim();
+        if (trimmed.startsWith('|')) trimmed = trimmed.substring(1);
+        if (trimmed.endsWith('|')) trimmed = trimmed.substring(0, trimmed.length - 1);
+        const cells = trimmed.split('|').map(c => c.trim());
+        maxCols = Math.max(maxCols, cells.length);
+        rows.push({ original: line, cells });
+     }
+
+     let hasSeparator = false;
+     if (rows.length > 1) {
+        hasSeparator = rows[1].cells.every(c => /^[-: ]+$/.test(c) && c.length > 0);
+     }
+
+     const colWidths = new Array(maxCols).fill(0);
+     for (let i = 0; i < rows.length; i++) {
+        if (hasSeparator && i === 1) continue;
+        for (let j = 0; j < rows[i].cells.length; j++) {
+           let cell = rows[i].cells[j];
+           let visibleLen = cell.replace(/\*\*|\*|`/g, '').length;
+           colWidths[j] = Math.max(colWidths[j] || 0, visibleLen);
+        }
+     }
+
+     let result = "";
+     let top = this.fmt.dim + "┌" + colWidths.map(w => "─".repeat(w + 2)).join("┬") + "┐" + this.getStateFmt() + "\n";
+     result += top;
+
+     for (let i = 0; i < rows.length; i++) {
+        if (hasSeparator && i === 1) {
+           result += this.fmt.dim + "├" + colWidths.map(w => "─".repeat(w + 2)).join("┼") + "┤" + this.getStateFmt() + "\n";
+           continue;
+        }
+
+        let rowStr = this.fmt.dim + "│" + this.getStateFmt() + " ";
+        for (let j = 0; j < colWidths.length; j++) {
+           let cell = rows[i].cells[j] || "";
+           let visibleLen = cell.replace(/\*\*|\*|`/g, '').length;
+           let padLen = Math.max(0, colWidths[j] - visibleLen);
+           
+           let formattedCell = cell
+              .replace(/\*\*(.*?)\*\*/g, this.fmt.bold + "$1" + this.getStateFmt())
+              .replace(/\*(.*?)\*/g, this.fmt.italic + "$1" + this.getStateFmt())
+              .replace(/`(.*?)`/g, this.fmt.cyan + "$1" + this.getStateFmt());
+              
+           rowStr += formattedCell + " ".repeat(padLen);
+           
+           if (j < colWidths.length - 1) {
+              rowStr += this.fmt.dim + " │" + this.getStateFmt() + " ";
+           } else {
+              rowStr += " " + this.fmt.dim + "│" + this.getStateFmt();
+           }
+        }
+        result += rowStr + "\n";
+     }
+
+     let bottom = this.fmt.dim + "└" + colWidths.map(w => "─".repeat(w + 2)).join("┴") + "┘" + this.getStateFmt() + "\n";
+     result += bottom;
+     return result;
   }
 }
 
@@ -259,6 +374,7 @@ class ConsoleChannel {
 
     console.log(BANNER);
     this.rl.prompt();
+    logger.debug("Console channel interactive interface started.");
 
     bus.on("subagent:start", payload => {
       if (payload.channel === "console") {
@@ -281,11 +397,22 @@ class ConsoleChannel {
 
     bus.on("tool:start", payload => {
       this.stopSpinner();
+      
+      let toolStr = payload.name;
+      try {
+        const args = typeof payload.args === 'string' ? JSON.parse(payload.args) : payload.args;
+        if (args && typeof args === 'object' && Object.keys(args).length > 0) {
+          let val = String(Object.values(args)[0]).replace(/\n/g, ' ');
+          if (val.length > 40) val = val.substring(0, 37) + '...';
+          toolStr = `${payload.name} (${val})`;
+        }
+      } catch (e) {}
+
       if (this.isStreaming) {
         this.lexer.flush();
-        process.stdout.write(`\n\n   ${DIM}[Working] Executing tool: ${payload.name}...${RESET}\n\n`);
+        process.stdout.write(`\n\n   ${DIM}[Working] Executing tool: ${toolStr}${RESET}\n\n`);
       } else {
-        console.log(`   ${DIM}[Working] Executing tool: ${payload.name}...${RESET}`);
+        console.log(`   ${DIM}[Working] Executing tool: ${toolStr}${RESET}`);
       }
       this.startSpinner("Working...");
     });
@@ -293,6 +420,7 @@ class ConsoleChannel {
     this.rl.on("line", line => {
       process.stdout.write(RESET);
       const text = line.trim();
+      logger.debug(`Received user input from console: "${text}"`);
       if (!text) {
         this.rl.prompt();
         return;
@@ -325,6 +453,7 @@ class ConsoleChannel {
     // Listen for responses back from Jared destined for the console
     bus.on("message:send", payload => {
       if (payload.channel === "console") {
+        logger.debug(`Sending response to console (Tokens: ${payload.usage ? JSON.stringify(payload.usage) : "N/A"}).`);
         this.stopSpinner();
         if (!this.isStreaming) {
           process.stdout.write(`\n${BOLD}${WHITE}Jared:${RESET} `);

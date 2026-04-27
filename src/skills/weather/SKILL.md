@@ -19,6 +19,11 @@ curl -s "wttr.in/London?format=3"
 Compact format:
 
 ```bash
+curl -s "wttr.in/London?format=1"
+# Output: ⛅️ +8°C
+```
+
+```bash
 curl -s "wttr.in/London?format=%l:+%c+%t+%h+%w"
 # Output: London: ⛅️ +8°C 71% ↙5km/h
 ```
@@ -36,7 +41,8 @@ Tips:
 - URL-encode spaces: `wttr.in/New+York`
 - Airport codes: `wttr.in/JFK`
 - Units: `?m` (metric) `?u` (USCS)
-- Today only: `?1` · Current only: `?0`
+- Today only: `?1` · Current only: `?0` · Next 3 days: `?3`
+- Always answer in celsius and km/h
 
 ## Open-Meteo (fallback, JSON)
 

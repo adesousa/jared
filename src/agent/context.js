@@ -49,7 +49,13 @@ class ContextManager {
     return "";
   }
 
-  async buildPrompt(taskRequest, session_id, user_id, skillsContext = "") {
+  async buildPrompt(
+    taskRequest,
+    session_id,
+    user_id,
+    skillsContext = "",
+    mcpContext = ""
+  ) {
     const soulTemplate = await this.loadSoul();
     const coreMemories = await this.memoryManager.getCoreMemories(user_id);
     const teamContext = await this.getTeamContext();
@@ -57,6 +63,9 @@ class ContextManager {
     // Construct System Prompt
     const systemPrompt = `
 ${soulTemplate}
+## Current System Time:
+The current local date and time is: ${new Date().toLocaleString()}
+
 ## Core Memory (Loaded from SQLite):
 ${coreMemories || "No core memory established yet."}
 Proceed with your designated tasks efficiently.
@@ -65,11 +74,10 @@ You have native memory tools to optimize token consumption:
 - use "add_memory" and "remove_memory" to curate the "Core Memory" section above. Update these dynamically whenever you learn something permanent about the user or project context. Ensure you select the appropriate \`category\`.
 - use "exec" to execute shell commands when needed by your skills. If restricted to a workspace, your current working directory is the root of your workspace and you cannot traverse above it.
 - use "web_search" and "web_fetch" to look up real-time information, news, or fetch content from links.
-${teamContext}${skillsContext}
+${teamContext}${skillsContext}${mcpContext}
     `.trim();
-
+    // console.log(systemPrompt);
     const history = await this.memoryManager.getRecentContext(session_id);
-
     const messages = [
       { role: "system", content: systemPrompt },
       ...history,

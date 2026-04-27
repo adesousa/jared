@@ -17,6 +17,7 @@ class AgentLoop extends EventEmitter {
     session_id,
     user_id,
     skillsContext = "",
+    mcpContext = "",
     onToken = null
   ) {
     this.isRunning = true;
@@ -28,13 +29,14 @@ class AgentLoop extends EventEmitter {
         taskRequest,
         session_id,
         user_id,
-        skillsContext
+        skillsContext,
+        mcpContext
       );
       // Loop until task is complete or max iterations reached
       for (let i = 0; i < this.maxIterations; i++) {
         const response = await this.provider.chat(
           messages,
-          [...this.skills.getTools(), ...this.mcp.getTools()],
+          this.skills.getTools(),
           onToken
         );
         // Accumulate token usage from each LLM call
@@ -50,7 +52,10 @@ class AgentLoop extends EventEmitter {
         // Handle tool calls
         messages.push(response.message);
         for (const toolCall of response.tool_calls) {
-          bus.emit("tool:start", { name: toolCall.function.name });
+          bus.emit("tool:start", { 
+            name: toolCall.function.name, 
+            args: toolCall.function.arguments 
+          });
           let result;
           if (this.mcp.hasTool(toolCall.function.name)) {
             result = await this.mcp.executeTool(

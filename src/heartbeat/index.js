@@ -56,7 +56,7 @@ class HeartbeatManager {
           let tasksList = [];
           i++;
           
-          while (i < lines.length && !lines[i].startsWith('##')) {
+          while (i < lines.length && !lines[i].startsWith('##') && !lines[i].startsWith('### ')) {
              if (lines[i].trim() !== '') {
                  if (lines[i].trim().startsWith('- ')) {
                      tasksList.push(lines[i].trim().substring(2));
