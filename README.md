@@ -8,20 +8,20 @@
 
 ⚡️ Delivers core agent functionality in less than **3,000** lines of code.
 
-📏 Real-time line count: **2,625 lines** (run `bash scripts/core_agent_lines.sh` or `bun run lines` to verify anytime)
+📏 Real-time line count: **2,968 lines** (run `bash scripts/core_agent_lines.sh` or `bun run lines` to verify anytime)
 
 ## 🧬 Agentic as a Service (AGAAS)
 
 Jared is an **opinionated AGAAS framework** — a ready-to-deploy AI agent that runs as a persistent service, not a one-shot chatbot.
 
-| Traditional Chatbot         | AGAAS (Jared)                                                 |
-| --------------------------- | ------------------------------------------------------------- |
-| You ask → it answers → done | Always-on, always listening                                   |
-| Single channel              | Multi-channel simultaneously (Telegram + Slack + Email + ...) |
-| Stateless or session-scoped | Persistent SQLite memory across all channels                  |
-| No initiative               | Proactive via heartbeat tasks & cron scheduling               |
-| Extensions require code     | Drop a `SKILL.md` file, restart, done                         |
-| Generic framework           | Opinionated: batteries included, decisions made               |
+| Traditional Chatbot         | AGAAS (Jared)                                                    |
+| --------------------------- | ---------------------------------------------------------------- |
+| You ask → it answers → done | Always-on, always listening                                      |
+| Single channel              | Multi-channel simultaneously (Telegram + Slack + WhatsApp + ...) |
+| Stateless or session-scoped | Persistent SQLite memory across all channels                     |
+| No initiative               | Proactive via heartbeat tasks & cron scheduling                  |
+| Extensions require code     | Drop a `SKILL.md` file, restart, done                            |
+| Generic framework           | Opinionated: batteries included, decisions made                  |
 
 ### The AGAAS Philosophy
 
@@ -187,45 +187,6 @@ jared start
 
 </details>
 
-<details>
-<summary><b>Email</b></summary>
-
-Give Jared its own email account. It polls **IMAP** for incoming mail and replies via **SMTP**.
-
-**1. Get credentials (Gmail example)**
-
-- Create a dedicated Gmail account (e.g. `my-jared@gmail.com`)
-- Enable 2-Step Verification → Create an [App Password](https://myaccount.google.com/apppasswords)
-
-**2. Configure**
-
-```json
-{
-  "channels": {
-    "email": {
-      "enabled": true,
-      "imapHost": "imap.gmail.com",
-      "imapPort": 993,
-      "imapUsername": "my-jared@gmail.com",
-      "imapPassword": "your-app-password",
-      "smtpHost": "smtp.gmail.com",
-      "smtpPort": 587,
-      "smtpUsername": "my-jared@gmail.com",
-      "smtpPassword": "your-app-password",
-      "fromAddress": "my-jared@gmail.com"
-    }
-  }
-}
-```
-
-**3. Run**
-
-```bash
-jared start
-```
-
-</details>
-
 ## 📦 Installation & Setup
 
 We recommend using **Bun** (primary) or **npm** (secondary).
@@ -322,6 +283,39 @@ Set your default provider and active model:
 | `thinking`      | Enable reasoning `<think>` blocks                                  | `true`          |
 | `model`         | The active model for the provider                                  | `glm-4.6:cloud` |
 | `maxIterations` | Max tool-use loops per message (prevents infinite loops/runaway $) | `15`            |
+
+### Explicit Model Routing
+
+You can explicitly ask Jared to process a specific message using a different provider than the default one by appending a flag to your message (e.g., `--mistral`, `--ollama`, `--openai`).
+
+When you use a flag, Jared will override the default configuration for that specific interaction and route your prompt to the requested provider.
+
+**Example usage:**
+
+- `translate this text in french --mistral`
+- `write a complex python script --openai`
+- `what is the weather like? --ollama`
+
+**Configuration:**
+To specify which model should be called when using a provider's flag, add a `default` key to the provider's configuration in `.jared/config.json`. If no `default` is specified, it will fall back to the first model in the `models` array.
+
+```json
+{
+  "providers": {
+    "ollama": {
+      "url": "http://localhost:11434/v1",
+      "keys": [
+        {
+          "name": "ollama-key",
+          "value": "ollama",
+          "default": "qwen3.5:4b-nvfp4",
+          "models": ["qwen3.5:4b-nvfp4", "glm-4.6:cloud"]
+        }
+      ]
+    }
+  }
+}
+```
 
 ### Channels
 
@@ -448,11 +442,11 @@ Jared supports [MCP](https://modelcontextprotocol.io/) — connect external tool
 }
 ```
 
-| Mode                 | Config                                                 | Example                         |
-| -------------------- | ------------------------------------------------------ | ------------------------------- |
-| **Stdio**            | `command` + `args`                                     | Local process via `npx` / `uvx` |
-| **HTTP/SSE**         | `type: "url"` + `url` + `headers` (optional)           | Remote endpoint                 |
-| **Streamable HTTP**  | `type: "url"` + `transport: "streamable"` + `url`      | Modern remote endpoint          |
+| Mode                | Config                                            | Example                         |
+| ------------------- | ------------------------------------------------- | ------------------------------- |
+| **Stdio**           | `command` + `args`                                | Local process via `npx` / `uvx` |
+| **HTTP/SSE**        | `type: "url"` + `url` + `headers` (optional)      | Remote endpoint                 |
+| **Streamable HTTP** | `type: "url"` + `transport: "streamable"` + `url` | Modern remote endpoint          |
 
 > **Pro-Tip**: You can add `"enabled": false` to any MCP server configuration to temporarily disable it and prevent its tools from injecting into Jared's context, without having to delete the config entirely.
 
@@ -479,7 +473,6 @@ Jared ships with these built-in tools (no configuration needed):
 | `spawn`             | Spawn a background subagent for async tasks (supports configurable roles via `src/team/`) |
 | `web_search`        | Search the web via Brave Search API                                                       |
 | `web_fetch`         | Fetch and extract readable text from any URL                                              |
-| `heartbeat`         | Manage the HEARTBEAT.md schedule (One Shot, Daily, Weekly, Monthly)                       |
 | `read_skill_manual` | Read the full markdown instructions from a skill so the agent knows how to use it         |
 
 ### 🧑‍💻 The `team/` Folder (Subagent Roles)
@@ -521,37 +514,43 @@ Instructions for the agent on how to use this skill...
 
 3. Restart Jared — the skill is automatically loaded!
 
-## 💓 Heartbeat
+## ⏰ Scheduling & Backlog
 
-Jared checks `.jared/HEARTBEAT.md` periodically (default: 30 seconds, configurable via `heartbeat.intervalMs`) for structured tasks. If active tasks are due, they are dispatched to the agent for processing.
+Jared uses `.jared/BACKLOG.md` as the single source of truth for both scheduled tasks (Cron) and the Product Backlog. Every 60 seconds, Jared automatically synchronizes his internal scheduler with this file. If you edit it manually, Jared will instantly load the new schedule!
 
 ```markdown
+# Project Backlog
+
 ## One Shot Tasks
 
-### 3:00 PM — Setup Repo
+### 📅 2026-05-04 10:00 — Call Client
 
-- Clone the repository and install dependencies
+- Discuss the new deliverables
 
 ## Daily Tasks
 
-### 9:00 AM — Morning Briefing
+### ⏰ 09:00 — Morning Briefing
 
-- Summarize schedule and emails
+- Summarize schedule and upcoming tasks
 
 ## Weekly Tasks
 
-### 5:00 PM Friday — Weekly Report
+### ⏰ Friday 17:00 — Weekly Report
 
 - Generate the weekly wrap-up report
 
 ## Monthly Tasks
 
-### 1st — Billing Review
+### ⏰ 25th 10:00 — Billing Review
 
 - Check API usage and billing
+
+## Product Backlog
+
+- [ ] Add the new feature
 ```
 
-The agent can manage these tasks directly using the `heartbeat` tool (actions: add, remove, list). `One Shot Tasks` are automatically removed after they are executed. You can still use the `cron` tool for simpler one-off reminders.
+The agent uses the `cron` tool to manage these tasks seamlessly. `One Shot Tasks` are automatically removed from the file after they are executed. You can simply ask Jared: _"Remind me to call John on Friday at 5pm"_ and he will add it to the file.
 
 ## CLI Reference
 
@@ -576,7 +575,7 @@ jared/
 ├── .jared/
 │   ├── config.json     # ⚙️ Agent configuration
 │   ├── memory.db       # 🧠 SQLite persistent memory
-│   ├── HEARTBEAT.md    # 💓 Recurring tasks file
+│   ├── BACKLOG.md      # ⏰ Scheduled tasks and Product Backlog
 │   └── workspace/      # 🔒 Exec sandbox (when restrictToWorkspace is on)
 ├── src/
 │   ├── agent/          # 🧠 Core agent logic
@@ -605,8 +604,7 @@ jared/
 │   ├── channels/       # 📱 Chat channel integrations
 │   ├── cli/            # 🖥️ Commands (util.parseArgs)
 │   ├── config/         # ⚙️ Configuration options
-│   ├── cron/           # ⏰ Scheduled tasks
-│   ├── heartbeat/      # 💓 HEARTBEAT.md reader & dispatcher
+│   ├── cron/           # ⏰ Scheduled tasks engine (BACKLOG.md sync)
 │   ├── mcp/            # 🔌 Model Context Protocol integrations
 │   ├── providers/      # 🤖 Universal LLM router
 │   ├── session/        # 💬 Conversation session tracking

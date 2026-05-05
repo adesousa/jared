@@ -19,9 +19,12 @@ class AgentManager {
   async spinUp(taskDescription, options = {}) {
     // Handle backwards compatibility for spinUp(taskDescription, modelOverride, channel, userId, sessionId)
     let opts = (typeof options === "string" || options === null) ? { modelOverride: arguments[1] || null, channel: arguments[2] || "default", userId: arguments[3] || "local_user", sessionId: arguments[4] || "session-1", isSubagent: false, role: null } : options;
-    const { modelOverride = null, channel = "default", userId = "local_user", sessionId = "session-1", isSubagent = false, role = null } = opts;
+    const { modelOverride = null, providerOverride = null, channel = "default", userId = "local_user", sessionId = "session-1", isSubagent = false, role = null } = opts;
 
-    const dbPath = this.config.memoryPath || path.join(process.cwd(), ".jared", "memory.db");
+    const dbPath = this.config.memoryPath || 
+      (this.config.projectName 
+        ? path.join(process.cwd(), ".jared", this.config.projectName, "memory.db") 
+        : path.join(process.cwd(), ".jared", "memory.db"));
     const memory = new MemoryManager(dbPath);
     await memory.initialize();
     
@@ -34,19 +37,21 @@ class AgentManager {
       isTeamRole = true;
     }
     
-    const context = new ContextManager(memory, customSoulPath, isTeamRole);
+    // Workspace sandboxing
+    const securityConfig = this.config.security || {};
+    const workspaceDir = path.resolve(process.cwd(), securityConfig.workspaceDir || 
+      (this.config.projectName ? `.jared/${this.config.projectName}/workspace` : ".jared/workspace"));
+    if (securityConfig.restrictToWorkspace) {
+      fs.mkdirSync(workspaceDir, { recursive: true });
+      securityConfig.workspaceDir = workspaceDir;
+    }
+
+    const context = new ContextManager(memory, customSoulPath, isTeamRole, securityConfig);
     
     const skills = new SkillsManager();
     const skillsDir = path.resolve(process.cwd(), "src", "skills");
     skills.loadSkillsFromDirectory(skillsDir, true);
 
-    // Workspace sandboxing
-    const securityConfig = this.config.security || {};
-    const workspaceDir = path.resolve(process.cwd(), securityConfig.workspaceDir || ".jared/workspace");
-    if (securityConfig.restrictToWorkspace) {
-      fs.mkdirSync(workspaceDir, { recursive: true });
-      securityConfig.workspaceDir = workspaceDir;
-    }
     const execGuard = new ExecGuard(securityConfig);
 
     // Initialize MCP early to make it available to dynamic tools
@@ -61,8 +66,7 @@ class AgentManager {
 
     // === Run agent loop ===
     
-    const provider = new ProviderRouter(this.config);
-    if (modelOverride) provider.setModel(modelOverride);
+    const provider = new ProviderRouter(this.config, providerOverride, modelOverride);
     
     let skillsContext = skills.getSkillsContext();
     let mcpContext = mcp.getMCPContext();

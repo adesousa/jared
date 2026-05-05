@@ -2,10 +2,11 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 class ContextManager {
-  constructor(memoryManager, soulPath, isTeamRole = false) {
+  constructor(memoryManager, soulPath, isTeamRole = false, securityConfig = {}) {
     this.memoryManager = memoryManager;
     this.soulPath = soulPath;
     this.isTeamRole = isTeamRole;
+    this.securityConfig = securityConfig;
     this.soulCache = null;
   }
 
@@ -60,12 +61,16 @@ class ContextManager {
     const coreMemories = await this.memoryManager.getCoreMemories(user_id);
     const teamContext = await this.getTeamContext();
 
+    const workspaceContext = this.securityConfig?.restrictToWorkspace && this.securityConfig?.workspaceDir 
+      ? `\n## Workspace Info:\nYou are restricted to the following workspace directory: ${this.securityConfig.workspaceDir}\nYou cannot access files outside of this directory.\n` 
+      : "";
+
     // Construct System Prompt
     const systemPrompt = `
 ${soulTemplate}
 ## Current System Time:
 The current local date and time is: ${new Date().toLocaleString()}
-
+${workspaceContext}
 ## Core Memory (Loaded from SQLite):
 ${coreMemories || "No core memory established yet."}
 Proceed with your designated tasks efficiently.

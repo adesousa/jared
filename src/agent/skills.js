@@ -109,13 +109,13 @@ class SkillsManager {
         }
       } catch (e) {
         if (!suppressLog) {
-          console.warn(`[Skills] Failed to load tool from ${toolPath}: ${e.message}`);
+          console.warn(`[Tools] Failed to load tool from ${toolPath}: ${e.message}`);
         }
       }
     }
 
     if (loadedCount > 0 && !suppressLog) {
-      console.log(`[Skills] Loaded ${loadedCount} dynamic tool(s) from ${toolsDir}`);
+      console.log(`[Tools] Loaded ${loadedCount} dynamic tool(s) from ${toolsDir}`);
     }
   }
 

@@ -9,7 +9,6 @@ import TelegramChannel from "../channels/telegram.js";
 import DiscordChannel from "../channels/discord.js";
 import SlackChannel from "../channels/slack.js";
 import WhatsAppChannel from "../channels/whatsapp.js";
-import HeartbeatManager from "../heartbeat/index.js";
 import bus from "../bus/index.js";
 import { logger, setDebug } from "../utils/index.js";
 import cronScheduler from "../cron/index.js";
@@ -27,13 +26,42 @@ async function main() {
   });
 
   if (values.help || positionals.length === 0) {
-    console.log("\nUsage: jared <command>\n\nCommands:\n  onboard       Initialize Jared config\n  start         Start Jared in interactive/channel listening mode\n  audit         Check dependencies for known vulnerabilities\n  lines         Count lines of code in the core agent\n  reset-memory  Reset the agent's memory database\n");
+    console.log("\nUsage: jared <command> [project-name]\n\nCommands:\n  onboard <project>       Initialize Jared config for a project\n  start <project>         Start Jared in interactive/channel listening mode\n  audit                   Check dependencies for known vulnerabilities\n  lines                   Count lines of code in the core agent\n  reset-memory <project>  Reset the project's memory database\n  stats <project>         Show core token usage stats for a project\n");
     process.exit(0);
   }
 
   const command = positionals[0];
-  const configManager = new ConfigManager();
-  const config = await configManager.load();
+  const projectName = positionals[1];
+
+  const projectCommands = ["onboard", "start", "reset-memory", "stats"];
+  
+  if (projectCommands.includes(command) && !projectName) {
+    const fsSync = await import("node:fs");
+    const jaredDir = path.join(process.cwd(), ".jared");
+    let projects = [];
+    try {
+      projects = fsSync.readdirSync(jaredDir, { withFileTypes: true })
+        .filter(d => d.isDirectory())
+        .map(d => d.name);
+    } catch(e) {}
+    
+    console.error(`\n\x1b[31mError: Project name is required for command '${command}'\x1b[0m`);
+    if (projects.length > 0) {
+      console.log(`\nExisting projects:\n${projects.map(p => `  - ${p}`).join('\n')}`);
+    } else {
+      console.log(`\nNo projects found. Use 'jared onboard <project-name>' to create one.`);
+    }
+    console.log(`\nUsage: jared ${command} <project-name>\n`);
+    process.exit(1);
+  }
+
+  let configManager;
+  let config;
+  
+  if (projectCommands.includes(command)) {
+    configManager = new ConfigManager(projectName);
+    config = await configManager.load();
+  }
 
   if (command === "onboard") {
     const readline = await import("node:readline");
@@ -49,9 +77,10 @@ async function main() {
       R = "\x1b[0m",
       G = "\x1b[32m";
 
-    console.log(`\n${P}${B}🧬 Jared Onboarding${R}\n`);
-    const soulDir = path.join(process.cwd(), ".jared");
+    console.log(`\n${P}${B}🧬 Jared Onboarding: ${projectName}${R}\n`);
+    const soulDir = path.join(process.cwd(), ".jared", projectName);
     await fs.mkdir(soulDir, { recursive: true });
+    await fs.mkdir(path.join(soulDir, "workspace"), { recursive: true });
 
     // #1: Config overwrite vs. refresh
     let configExists = false;
@@ -110,16 +139,16 @@ async function main() {
       }
       console.log(`\n${P}🎬${R} Jared Dunn persona activated!`);
     }
-    console.log(`${D}   Soul saved to: .jared/SOUL.md (edit anytime)${R}`);
+    console.log(`${D}   Soul saved to: .jared/${projectName}/SOUL.md (edit anytime)${R}`);
 
-    // #2: Create HEARTBEAT.md template
-    const hbPath = path.join(soulDir, "HEARTBEAT.md");
+    // #2: Create BACKLOG.md template
+    const hbPath = path.join(soulDir, "BACKLOG.md");
     try {
       await fs.access(hbPath);
     } catch {
-      const hbTemplate = `# Heartbeat Schedule\n\n## One Shot Tasks\n\n## Daily Tasks\n### 6:45 AM — Morning Briefing\n- Check Google Calendar: list all events for today with times\n\n## Weekly Tasks\n### 5:00 PM Friday — Weekly Report\n- Pull this week's key metrics vs. last week\n\n## Monthly Tasks\n### 25th — Lead Alert\n- Check Accountability CRM\n`;
+      const hbTemplate = `# Project Backlog\n\n## One Shot Tasks\n\n## Daily Tasks\n### ⏰ 06:45 — Morning Briefing\n- Check Google Calendar: list all events for today with times\n\n## Weekly Tasks\n### ⏰ Friday 17:00 — Weekly Report\n- Pull this week's key metrics vs. last week\n\n## Monthly Tasks\n### ⏰ 25th 10:00 — Lead Alert\n- Check Accountability CRM\n\n## Product Backlog\n`;
       await fs.writeFile(hbPath, hbTemplate, "utf8");
-      console.log(`${G}✓${R} Created .jared/HEARTBEAT.md`);
+      console.log(`${G}✓${R} Created .jared/${projectName}/BACKLOG.md`);
     }
 
     // #4: Global Link
@@ -140,13 +169,13 @@ async function main() {
     }
 
     // #5: Next Steps
-    console.log(`\n${B}Next steps:${R}\n  1. Add your API key to ${P}.jared/config.json${R}`);
+    console.log(`\n${B}Next steps:${R}\n  1. Add your API key to ${P}.jared/${projectName}/config.json${R}`);
     if (linked) {
-      console.log(`  2. Start chatting: ${P}jared start${R}`);
+      console.log(`  2. Start chatting: ${P}jared start ${projectName}${R}`);
     } else {
-      console.log(`  2. Start chatting: ${P}bun run jared${R} ${D}(or run 'bun link' to use 'jared' anywhere)${R}`);
+      console.log(`  2. Start chatting: ${P}bun run jared start ${projectName}${R} ${D}(or run 'bun link' to use 'jared' anywhere)${R}`);
     }
-    console.log(`  3. Edit your persona: ${P}.jared/SOUL.md${R}\n  4. Add recurring tasks: ${P}.jared/HEARTBEAT.md${R}\n`);
+    console.log(`  3. Edit your persona: ${P}.jared/${projectName}/SOUL.md${R}\n  4. Add recurring tasks: ${P}.jared/${projectName}/BACKLOG.md${R}\n`);
 
     rl.close();
     process.exit(0);
@@ -163,10 +192,23 @@ async function main() {
           if (err.status && err.status > 0) { console.log("\n⚠️  Vulnerabilities found. Run 'npm audit fix' to resolve."); }
         }
       } else if (command === "lines") { execSync("bash scripts/core_agent_lines.sh", { cwd, stdio: "inherit" });
-      } else if (command === "reset-memory") { execSync("bash scripts/reset_memory.sh", { cwd, stdio: "inherit" });
+      } else if (command === "reset-memory") {
+        const fs = await import("node:fs/promises");
+        const dbPath = path.join(cwd, ".jared", projectName, "memory.db");
+        console.log(`Attempting to reset memory for project '${projectName}'...`);
+        try {
+          await fs.unlink(dbPath);
+          console.log("🧹 Success! Jared's memory has been completely wiped!");
+        } catch (err) {
+          if (err.code === "ENOENT") {
+            console.log(`ℹ️ No memory database found at ${dbPath}. Jared's mind is already clear.`);
+          } else {
+            console.error(`Failed to delete memory database: ${err.message}`);
+          }
+        }
       } else if (command === "stats") {
         const MemoryManager = (await import("../agent/memory.js")).default;
-        const memory = new MemoryManager(path.join(cwd, ".jared", "memory.db"));
+        const memory = new MemoryManager(path.join(cwd, ".jared", projectName, "memory.db"));
         await memory.initialize();
         const stats = await memory.getStats();
 
@@ -183,9 +225,10 @@ async function main() {
         console.log(`${B}Total Tokens:   ${P}${formatNumber(stats.total.prompt + stats.total.completion)}${R}\n`);
 
         if (stats.byModel && stats.byModel.length > 0) {
-          console.log(`${D}Usage by Model${R}`);
-          const maxModelLen = Math.max(...stats.byModel.map(m => m.model.length), 20);
-          stats.byModel.forEach(m => {
+          console.log(`${D}Top 10 Models by Usage${R}`);
+          const topModels = [...stats.byModel].sort((a, b) => (b.prompt + b.completion) - (a.prompt + a.completion)).slice(0, 10);
+          const maxModelLen = Math.max(...topModels.map(m => m.model.length), 20);
+          topModels.forEach(m => {
             const mTotal = m.prompt + m.completion;
             const barLength = Math.max(1, Math.floor((mTotal / (stats.total.prompt + stats.total.completion)) * 20));
             const bar = '█'.repeat(barLength) + '░'.repeat(20 - barLength);
@@ -217,46 +260,61 @@ async function main() {
       G = "\x1b[32m",
       Y = "\x1b[33m";
 
-    // Channel status check at startup
+    // Load config & stats
+    const { readFile } = await import("node:fs/promises");
+    const pkg = JSON.parse(await readFile(path.join(process.cwd(), "package.json"), "utf8"));
     const provider = config.agents?.defaults?.provider || "unknown";
-    const activeProvider = config.providers?.[provider];
-    const model = config.agents?.defaults?.model || activeProvider?.keys?.[0]?.models?.[0] || "unknown";
-    console.log(
-      `${D}  Provider: ${R}${P}${provider}${R} ${D}| Model: ${R}${P}${model}${R}`
-    );
+    const model = config.agents?.defaults?.model || config.providers?.[provider]?.keys?.[0]?.models?.[0] || "unknown";
+    const channels = Object.entries(config.channels || {}).filter(([, v]) => v.enabled).map(([k]) => k);
 
-    const enabledChannels = Object.entries(config.channels || {}).filter(([, v]) => v.enabled).map(([k]) => k);
-    if (enabledChannels.length > 0) { console.log(`  ${G}✓${R} Channels: ${enabledChannels.join(", ")}`);
-    } else { console.log(`  ${Y}⚠${R} No channels enabled`); }
+    // Load skills & tools silently
+    const skillsDir = path.resolve(process.cwd(), "src", "skills");
+    const toolsDir = path.resolve(process.cwd(), "src", "tools");
+    const startupSkills = new SkillsManager();
+    startupSkills.loadSkillsFromDirectory(skillsDir, true);
+    await startupSkills.loadToolsFromDirectory(toolsDir, {}, true);
 
-    const cronCount = cronScheduler.jobs?.size || 0;
-    const heartbeatIntervalMs = config.heartbeat?.intervalMs || 30000;
-    console.log(
-      `  ${G}✓${R} Cron: ${cronCount} job${cronCount !== 1 ? "s" : ""} | Heartbeat: ${heartbeatIntervalMs / 1000}s\n`
-    );
+    // Unified startup display
+    console.log(`\n${P}${B}🤖 Jared: v${pkg.version}${R}`);
+    console.log(`  ${G}✓${R} Provider: ${P}${provider}${R} | Model: ${P}${model}${R}`);
+    console.log(`  ${channels.length > 0 ? `${G}✓${R} Channels: ${channels.join(", ")}` : `${Y}⚠${R} No channels enabled`}`);
+    console.log(`  ${G}✓${R} Scheduler: Backlog Synced`);
+    console.log(`  ${G}✓${R} Skills: ${startupSkills.skillInstructions.length} | Tools: ${startupSkills.tools.length}\n`);
 
     // Debug mode from config
     setDebug(config.debug === true);
 
-    cronScheduler.start();
+    cronScheduler.start(projectName);
 
-    const skillsDir = path.resolve(process.cwd(), "src", "skills");
-    const startupSkills = new SkillsManager();
-    startupSkills.loadSkillsFromDirectory(skillsDir);
+    const securityConfig = config.security || {};
+    if (securityConfig.restrictToWorkspace) {
+      const workspaceDir = path.resolve(process.cwd(), securityConfig.workspaceDir || `.jared/${projectName}/workspace`);
+      console.log(`[INFO] Workspace restricted to: ${workspaceDir}`);
+    }
 
-    const heartbeatPath = path.join(process.cwd(), ".jared", "HEARTBEAT.md");
-    const heartbeat = new HeartbeatManager(heartbeatPath, heartbeatIntervalMs);
-    heartbeat.start();
     const agentManager = new AgentManager(config);
 
     bus.on("message:received", async payload => {
       try {
+        let content = payload.content;
+        let providerOverride = null;
+        
+        // Match --provider flags
+        const providersKeys = Object.keys(config.providers || {});
+        const match = content.match(/--([a-zA-Z0-9_-]+)(?:\s|$)/);
+        if (match && providersKeys.includes(match[1])) {
+          providerOverride = match[1];
+          content = content.replace(match[0], " ").trim();
+        }
+
         const result = await agentManager.spinUp(
-          payload.content,
-          null,
-          payload.channel,
-          payload.userId,
-          payload.sessionId
+          content,
+          {
+            providerOverride,
+            channel: payload.channel,
+            userId: payload.userId,
+            sessionId: payload.sessionId
+          }
         );
         bus.emit("message:send", {
           channel: payload.channel,
@@ -279,22 +337,27 @@ async function main() {
       }
     });
 
-    bus.on("heartbeat", async ({ tasks }) => {
+    bus.on("cron:trigger", async ({ tasks }) => {
       const prompt = `[System Trigger] The following scheduled tasks are due NOW:\n${tasks.map(t => `- ${t}`).join("\n")}\n\nYour job is to strictly perform the action or immediately remind the user. Do not schedule them again using tools.`;
       try {
         const result = await agentManager.spinUp(
           prompt,
           null,
-          "heartbeat",
+          "cron",
           "system",
-          "heartbeat"
+          "cron"
         );
-        if (result.content)
-          logger.info(
-            `[Heartbeat] Agent response: ${result.content.substring(0, 100)}...`
-          );
+        if (result.content && result.content.trim() !== "") {
+          logger.debug(`[Cron] Agent response: ${result.content.substring(0, 100)}...`);
+          bus.emit("message:send", {
+             channel: "console",
+             userId: "system",
+             sessionId: "cron",
+             content: result.content
+          });
+        }
       } catch (e) {
-        logger.error("[Heartbeat] Agent error:", e);
+        logger.error("[Cron] Agent error:", e);
       }
     });
 

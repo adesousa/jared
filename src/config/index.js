@@ -2,8 +2,10 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 class ConfigManager {
-  constructor() {
-    this.configPath = path.join(process.cwd(), ".jared", "config.json");
+  constructor(projectName) {
+    if (!projectName) throw new Error("ConfigManager requires a projectName");
+    this.projectName = projectName;
+    this.configPath = path.join(process.cwd(), ".jared", projectName, "config.json");
     this.config = {};
   }
 
@@ -16,6 +18,7 @@ class ConfigManager {
       this.config = this._getDefaults();
       await this._save();
     }
+    this.config.projectName = this.projectName;
     return this.config;
   }
 
@@ -61,7 +64,6 @@ class ConfigManager {
         openrouter: { url: "https://openrouter.ai/api/v1", keys: [{ name: "openrouter-key", value: "", models: [] }] }
       },
       agents: { defaults: { provider: "ollama", model: "qwen3:4b-instruct", maxIterations: 15 } },
-      heartbeat: { intervalMs: 30000 },
       mcp: { servers: {} },
       tools: { web: { search: { apiKey: "" } } },
       channels: {
@@ -69,17 +71,17 @@ class ConfigManager {
         discord: { enabled: false, token: "" },
         slack: { enabled: false, botToken: "", appToken: "" },
         telegram: { enabled: false, token: "" },
-        whatsapp: { enabled: false },
-        email: { enabled: false }
+        whatsapp: { enabled: false }
       },
       security: {
-        restrictToWorkspace: false, workspaceDir: ".jared/workspace",
+        restrictToWorkspace: false, workspaceDir: `.jared/${this.projectName}/workspace`,
         exec: {
           mode: "confirm",
           allowedBins: ["curl", "gh", "summarize", "crontab", "echo", "cat", "grep", "head", "tail", "wc", "date", "uname", "whoami", "pwd", "ls", "find", "jq", "sort", "uniq", "awk", "sed", "tr", "npx", "node", "bun", "python3", "python", "git", "mkdir", "touch", "cp"]
         }
       },
-      soulPath: path.resolve(process.cwd(), "src/identity/SOUL.md"),
+      soulPath: path.resolve(process.cwd(), ".jared", this.projectName, "SOUL.md"),
+      memoryPath: path.resolve(process.cwd(), ".jared", this.projectName, "memory.db"),
       debug: false
     };
   }

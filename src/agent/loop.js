@@ -84,6 +84,7 @@ class AgentLoop extends EventEmitter {
       throw error;
     } finally {
       this.isRunning = false;
+      bus.emit("task:end");
     }
   }
 }

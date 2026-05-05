@@ -13,7 +13,10 @@ export default {
     }
   },
   execute: async ({ content, target_channel, target_user }, { bus, channel, userId, sessionId }) => {
-    const destChannel = target_channel || channel;
+    let destChannel = target_channel || channel;
+    if (destChannel === "cron" || destChannel === "system") {
+      destChannel = "console";
+    }
     const destUser = target_user || userId;
     bus.emit("message:send", { channel: destChannel, userId: destUser, sessionId, content });
     return `Message sent to ${destChannel}:${destUser}`;

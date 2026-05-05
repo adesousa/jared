@@ -1,5 +1,6 @@
 {
   "name": "jared",
+  "version": "0.4.0",
   "main": "src/cli/index.js",
   "bin": {
     "jared": "./src/cli/index.js"
@@ -9,8 +10,9 @@
     "onboard": "bun run src/cli/index.js onboard",
     "jared": "bun run src/cli/index.js start",
     "audit": "bun run src/cli/index.js audit",
-    "lines": "bash scripts/core_agent_lines.sh",
-    "reset-memory": "bash scripts/reset_memory.sh"
+    "stats": "bun run src/cli/index.js stats",
+    "reset-memory": "bun run src/cli/index.js reset-memory",
+    "lines": "bash scripts/core_agent_lines.sh"
   },
   "private": true,
   "type": "module",

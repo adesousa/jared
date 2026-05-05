@@ -1,47 +1,45 @@
 export default {
   schema: {
     name: "cron",
-    description: "Schedule reminders and recurring tasks. Actions: add, list, remove.",
+    description: "Schedule reminders and recurring tasks. Persists automatically to BACKLOG.md. Categories: 'One Shot Tasks', 'Daily Tasks', 'Weekly Tasks', 'Monthly Tasks'. Actions: add, list, remove.",
     parameters: {
       type: "object",
       properties: {
         action: { type: "string", enum: ["add", "list", "remove"], description: "Action to perform" },
-        message: { type: "string", description: "Reminder message (for add)" },
-        every_seconds: { type: "integer", description: "Interval in seconds (for recurring tasks)" },
-        cron_expr: { type: "string", description: "Cron expression like '0 9 * * *' (for scheduled tasks)" },
-        tz: { type: "string", description: "IANA timezone for cron expressions (e.g. 'Europe/Paris')" },
-        at: { type: "string", description: "ISO datetime for one-time execution (e.g. '2026-03-21T10:30:00')" },
-        job_id: { type: "string", description: "Job ID (for remove)" }
+        category: { type: "string", enum: ["One Shot Tasks", "Daily Tasks", "Weekly Tasks", "Monthly Tasks"], description: "Required for 'add'" },
+        time_spec: { type: "string", description: "Time string. Daily: '09:00', Weekly: 'Wednesday 09:00', Monthly: '25th 10:00', One Shot: '2026-05-04 10:00'" },
+        title: { type: "string", description: "Title of the task (for add/remove)" },
+        description: { type: "string", description: "Actionable description with bullet points (for add)" }
       },
       required: ["action"]
     }
   },
-  execute: async ({ action, message, every_seconds, cron_expr, tz, at, job_id }, { cronScheduler, channel, userId, sessionId }) => {
+  execute: async ({ action, category, time_spec, title, description }, { cronScheduler }) => {
     if (action === "list") {
       const jobs = cronScheduler.listJobs();
-      if (jobs.length === 0) return "No scheduled jobs.";
-      return "Scheduled jobs:\n" + jobs.map(j => `- ${j.id} [${j.kind}] ${j.message}`).join("\n");
+      if (jobs.length === 0) return "No scheduled jobs in BACKLOG.md.";
+      return "Scheduled jobs:\n" + jobs.map(j => `- [${j.category}] ${j.title} (Time: ${j.timeStr || j.cronExpr || new Date(j.atMs).toLocaleString()})`).join("\n");
     }
+    
     if (action === "remove") {
-      if (!job_id) return "Error: job_id is required for remove";
-      return cronScheduler.removeJob(job_id) ? `Removed job ${job_id}` : `Job ${job_id} not found`;
+      if (!title) return "Error: title is required for remove";
+      return cronScheduler.removeJob(title) ? `Removed task '${title}' from BACKLOG.md` : `Task '${title}' not found`;
     }
+    
     if (action === "add") {
-      if (!message) return "Error: message is required for add";
-      const opts = { message, channel, userId, sessionId };
-      if (every_seconds) {
-        opts.everyMs = every_seconds * 1000;
-      } else if (cron_expr) {
-        opts.cronExpr = cron_expr;
-        opts.tz = tz || null;
-      } else if (at) {
-        opts.atMs = new Date(at).getTime();
-      } else {
-        return "Error: provide every_seconds, cron_expr, or at";
+      if (!category || !time_spec || !title) {
+         return "Error: category, time_spec, and title are required for add";
       }
-      const job = cronScheduler.addJob(opts);
-      return `Created job '${job.id}' [${job.kind}]: ${message}`;
+      
+      let descLines = [];
+      if (description) {
+         descLines = description.split('\n').map(l => l.trim().startsWith('-') ? l.trim() : `- ${l.trim()}`);
+      }
+      cronScheduler.addJob(category, time_spec, title, descLines);
+      
+      return `Added task '${title}' to '${category}' in BACKLOG.md`;
     }
+    
     return `Unknown action: ${action}`;
   }
 };

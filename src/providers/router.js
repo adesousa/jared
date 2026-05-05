@@ -2,15 +2,18 @@ import OpenAI from "openai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 class ProviderRouter {
-  constructor(config = {}) {
-    this.activeProviderName = config.agents?.defaults?.provider;
+  constructor(config = {}, providerOverride = null, modelOverride = null) {
+    this.activeProviderName = providerOverride || config.agents?.defaults?.provider;
     this.thinking = config.agents?.defaults?.thinking ?? true;
     
     const activeProvider = this.activeProviderName
       ? config.providers?.[this.activeProviderName]
       : null;
-    this.model =
-      config.agents?.defaults?.model || activeProvider?.keys?.[0]?.models?.[0];
+      
+    // Try to find the default model in the new "default" key, otherwise fallback to the first model in the array
+    const defaultModelForProvider = activeProvider?.keys?.[0]?.default || activeProvider?.keys?.[0]?.models?.[0];
+    
+    this.model = modelOverride || (providerOverride ? defaultModelForProvider : (config.agents?.defaults?.model || defaultModelForProvider));
     const apiKey = activeProvider?.keys?.[0]?.value;
     if (this.activeProviderName === "gemini") {
       this.isGemini = true;
@@ -39,28 +42,40 @@ class ProviderRouter {
       params.tools = tools;
       params.tool_choice = "auto";
     }
-    params.extra_body = {
-      chat_template_kwargs: { enable_thinking: this.thinking }
-    };
+
+    const officialProviders = ["mistral", "openai"];
+    if (!officialProviders.includes(this.activeProviderName)) {
+      params.extra_body = {
+        chat_template_kwargs: { enable_thinking: this.thinking }
+      };
+    }
 
     if (!onToken) {
-      const response = await this.openai.chat.completions.create(params);
-      const message = response.choices[0].message;
-      let content = message.content;
-      if (Array.isArray(content))
-        content = content
-          .filter(p => p.type === "text")
-          .map(p => p.text)
-          .join("");
-      return {
-        content,
-        tool_calls: message.tool_calls || [],
-        message: { ...message, content },
-        usage: {
-          promptTokens: response.usage?.prompt_tokens || 0,
-          completionTokens: response.usage?.completion_tokens || 0
+      try {
+        const response = await this.openai.chat.completions.create(params);
+        const message = response.choices[0].message;
+        let content = message.content;
+        if (Array.isArray(content))
+          content = content
+            .filter(p => p.type === "text")
+            .map(p => p.text)
+            .join("");
+        return {
+          content,
+          tool_calls: message.tool_calls || [],
+          message: { ...message, content },
+          usage: {
+            promptTokens: response.usage?.prompt_tokens || 0,
+            completionTokens: response.usage?.completion_tokens || 0
+          }
+        };
+      } catch (e) {
+        const msg = e.message ? e.message.toLowerCase() : "";
+        if (tools.length > 0 && (e.status === 404 || e.status === 400 || msg.includes("tool"))) {
+          return this._chatOpenAI(messages, [], onToken);
         }
-      };
+        throw e;
+      }
     }
 
     try {
@@ -112,6 +127,10 @@ class ProviderRouter {
         usage: { promptTokens, completionTokens }
       };
     } catch (e) {
+      const msg = e.message ? e.message.toLowerCase() : "";
+      if (tools.length > 0 && (e.status === 404 || e.status === 400 || msg.includes("tool"))) {
+        return this._chatOpenAI(messages, [], onToken);
+      }
       if (
         e.message &&
         (e.message.toLowerCase().includes("stream") ||
@@ -131,19 +150,23 @@ class ProviderRouter {
       } else if (msg.role === "user") {
         contents.push({ role: "user", parts: [{ text: msg.content }] });
       } else if (msg.role === "assistant") {
-        if (msg.tool_calls?.length > 0) {
-          contents.push({
-            role: "model",
-            parts: msg.tool_calls.map(tc => {
-              const funcCall = {
-                name: tc.function.name,
-                args: JSON.parse(tc.function.arguments)
-              };
-              if (tc.function.thought_signature)
-                funcCall.thought_signature = tc.function.thought_signature;
-              return { functionCall: funcCall };
-            })
-          });
+        if (msg.gemini_parts) {
+          contents.push({ role: "model", parts: msg.gemini_parts });
+        } else if (msg.tool_calls?.length > 0) {
+          const parts = [];
+          if (msg.content) parts.push({ text: msg.content });
+          parts.push(...msg.tool_calls.map(tc => {
+            const funcCall = {
+              name: tc.function.name,
+              args: JSON.parse(tc.function.arguments)
+            };
+            const part = { functionCall: funcCall };
+            if (tc.function.thought_signature) {
+              part.thoughtSignature = tc.function.thought_signature;
+            }
+            return part;
+          }));
+          contents.push({ role: "model", parts });
         } else {
           contents.push({
             role: "model",
@@ -151,17 +174,18 @@ class ProviderRouter {
           });
         }
       } else if (msg.role === "tool") {
-        contents.push({
-          role: "user",
-          parts: [
-            {
-              functionResponse: {
-                name: msg.name,
-                response: { name: msg.name, content: msg.content }
-              }
-            }
-          ]
-        });
+        const part = {
+          functionResponse: {
+            name: msg.name,
+            response: { name: msg.name, content: msg.content }
+          }
+        };
+        const lastContent = contents[contents.length - 1];
+        if (lastContent && lastContent.role === "user" && lastContent.parts[0]?.functionResponse) {
+          lastContent.parts.push(part);
+        } else {
+          contents.push({ role: "user", parts: [part] });
+        }
       }
     }
 
@@ -185,10 +209,14 @@ class ProviderRouter {
     let response,
       fullContent = "";
 
+    const manualParts = [];
     if (onToken) {
       try {
         const result = await modelInstance.generateContentStream({ contents });
         for await (const chunk of result.stream) {
+          if (chunk.candidates?.[0]?.content?.parts) {
+            manualParts.push(...chunk.candidates[0].content.parts);
+          }
           try {
             const chunkText = chunk.text();
             if (chunkText) {
@@ -198,6 +226,10 @@ class ProviderRouter {
           } catch (e) {}
         }
         response = await result.response;
+        // Fix for SDK bug: manually aggregated parts preserve thoughtSignature
+        if (response.candidates?.[0]?.content) {
+          response.candidates[0].content.parts = manualParts;
+        }
       } catch (e) {
         return this._chatGemini(messages, tools, null);
       }
@@ -214,13 +246,19 @@ class ProviderRouter {
       response?.candidates?.[0]?.content?.parts || []
     ).filter(p => p.functionCall);
     for (const p of rawFunctionCallParts) {
+      const funcDef = {
+        name: p.functionCall.name,
+        arguments: JSON.stringify(p.functionCall.args)
+      };
+      if (p.thoughtSignature) funcDef.thought_signature = p.thoughtSignature;
+      if (p.thought_signature) funcDef.thought_signature = p.thought_signature;
+      if (p.functionCall.thought_signature) funcDef.thought_signature = p.functionCall.thought_signature;
+      if (p.functionCall.thoughtSignature) funcDef.thought_signature = p.functionCall.thoughtSignature;
+
       parsedToolCalls.push({
         id: `call_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
         type: "function",
-        function: {
-          name: p.functionCall.name,
-          arguments: JSON.stringify(p.functionCall.args)
-        }
+        function: funcDef
       });
     }
 
@@ -237,7 +275,8 @@ class ProviderRouter {
       message: {
         role: "assistant",
         content: fullContent,
-        tool_calls: parsedToolCalls.length > 0 ? parsedToolCalls : undefined
+        tool_calls: parsedToolCalls.length > 0 ? parsedToolCalls : undefined,
+        gemini_parts: response?.candidates?.[0]?.content?.parts
       },
       usage: { promptTokens, completionTokens }
     };

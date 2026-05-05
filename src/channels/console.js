@@ -395,6 +395,13 @@ class ConsoleChannel {
       this.startSpinner("Thinking...");
     });
 
+    bus.on("task:end", () => {
+      this.stopSpinner();
+      if (!this.isStreaming) {
+         this.rl.prompt(true);
+      }
+    });
+
     bus.on("tool:start", payload => {
       this.stopSpinner();
       
