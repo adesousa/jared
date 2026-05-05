@@ -77,7 +77,7 @@ Jared is an **opinionated AGAAS framework** — a ready-to-deploy AI agent that 
 **3. Run**
 
 ```bash
-jared start
+jared start <project-name>
 ```
 
 </details>
@@ -118,7 +118,7 @@ jared start
 **5. Run**
 
 ```bash
-jared start
+jared start <project-name>
 ```
 
 </details>
@@ -157,7 +157,7 @@ Uses **Socket Mode** — no public URL required.
 **4. Run**
 
 ```bash
-jared start
+jared start <project-name>
 ```
 
 </details>
@@ -182,7 +182,7 @@ Requires **Node.js ≥18**.
 **2. Run** and scan the QR code with WhatsApp → Settings → Linked Devices
 
 ```bash
-jared start
+jared start <project-name>
 ```
 
 </details>
@@ -203,10 +203,10 @@ bun link
 2. Initialize
 
 ```bash
-jared onboard
+jared onboard <project-name>
 ```
 
-3. Configure (`.jared/config.json`)
+3. Configure (`.jared/<project-name>/config.json`)
 
 Add or merge these parts into your config (other options have defaults).
 
@@ -297,7 +297,7 @@ When you use a flag, Jared will override the default configuration for that spec
 - `what is the weather like? --ollama`
 
 **Configuration:**
-To specify which model should be called when using a provider's flag, add a `default` key to the provider's configuration in `.jared/config.json`. If no `default` is specified, it will fall back to the first model in the `models` array.
+To specify which model should be called when using a provider's flag, add a `default` key to the provider's configuration in `.jared/<project-name>/config.json`. If no `default` is specified, it will fall back to the first model in the `models` array.
 
 ```json
 {
@@ -367,7 +367,7 @@ Configure workspace sandboxing to restrict all exec commands to a dedicated dire
 {
   "security": {
     "restrictToWorkspace": true,
-    "workspaceDir": ".jared/workspace"
+    "workspaceDir": ".jared/<project-name>/workspace"
   }
 }
 ```
@@ -455,7 +455,7 @@ MCP tools are automatically discovered and registered on startup. The LLM can us
 4. Start Jared and Chat:
 
 ```bash
-jared start
+jared start <project-name>
 ```
 
 ## 🛠️ Native Tools
@@ -516,7 +516,7 @@ Instructions for the agent on how to use this skill...
 
 ## ⏰ Scheduling & Backlog
 
-Jared uses `.jared/BACKLOG.md` as the single source of truth for both scheduled tasks (Cron) and the Product Backlog. Every 60 seconds, Jared automatically synchronizes his internal scheduler with this file. If you edit it manually, Jared will instantly load the new schedule!
+Jared uses `.jared/<project-name>/BACKLOG.md` as the single source of truth for both scheduled tasks (Cron) and the Product Backlog. Every 60 seconds, Jared automatically synchronizes his internal scheduler with this file. If you edit it manually, Jared will instantly load the new schedule!
 
 ```markdown
 # Project Backlog
@@ -554,13 +554,14 @@ The agent uses the `cron` tool to manage these tasks seamlessly. `One Shot Tasks
 
 ## CLI Reference
 
-| Command              | Description                                                       |
-| -------------------- | ----------------------------------------------------------------- |
-| `jared onboard`      | Initialize the agent and generate `.jared/config.json`            |
-| `jared start`        | Start Jared in interactive mode and connect configured channels   |
-| `jared lines`        | Check real-time codebase size (ensuring it stays under 3,000 LOC) |
-| `jared reset-memory` | Completely wipe the agent's persistent memory database            |
-| `jared audit`        | Run dependency security audit (checks for known vulnerabilities)  |
+| Command                        | Description                                                       |
+| ------------------------------ | ----------------------------------------------------------------- |
+| `jared onboard <project>`      | Initialize the agent and generate `.jared/<project>/config.json`  |
+| `jared start <project>`        | Start Jared in interactive mode and connect configured channels   |
+| `jared lines`                  | Check real-time codebase size (ensuring it stays under 3,000 LOC) |
+| `jared reset-memory <project>` | Completely wipe the project's persistent memory database          |
+| `jared stats <project>`        | Show core token usage stats for a project                        |
+| `jared audit`                  | Run dependency security audit (checks for known vulnerabilities)  |
 
 Interactive mode exits: `exit`, `quit`, or `Ctrl+D`.
 
@@ -573,10 +574,12 @@ Jared utilizes a generalized event bus natively (`EventEmitter`) to bridge decou
 ```text
 jared/
 ├── .jared/
-│   ├── config.json     # ⚙️ Agent configuration
-│   ├── memory.db       # 🧠 SQLite persistent memory
-│   ├── BACKLOG.md      # ⏰ Scheduled tasks and Product Backlog
-│   └── workspace/      # 🔒 Exec sandbox (when restrictToWorkspace is on)
+│   └── <project-name>/
+│       ├── config.json     # ⚙️ Agent configuration
+│       ├── memory.db       # 🧠 SQLite persistent memory
+│       ├── BACKLOG.md      # ⏰ Scheduled tasks and Product Backlog
+│       ├── SOUL.md         # 📜 Agent persona and guidelines
+│       └── workspace/      # 🔒 Exec sandbox (when restrictToWorkspace is on)
 ├── src/
 │   ├── agent/          # 🧠 Core agent logic
 │   │   ├── agent.js    #    Agent manager (spinUp orchestrator)
