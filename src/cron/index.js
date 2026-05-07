@@ -231,8 +231,6 @@ class CronScheduler {
      }
      return removed;
   }
-  
-  // Removed removeOneShotJob as logic is inlined in tick()
 
   listJobs() {
       return [...this.jobs.values()];
