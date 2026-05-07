@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 import bus from "../bus/index.js";
+import { logger } from "../utils/index.js";
 
 class AgentLoop extends EventEmitter {
   constructor(context, memory, skills, mcp, provider, maxIterations = 15) {
@@ -74,6 +75,8 @@ class AgentLoop extends EventEmitter {
             name: toolCall.function.name,
             content: JSON.stringify(result)
           });
+          logger.debug(`Tool '${toolCall.function.name}' execution completed.`);
+          logger.debug(`Tool result:`, result);
         }
       }
       const fallbackContent = "I have reached the maximum number of iterations allowed for this task without completing it. Please try refining your request or breaking it down into smaller steps.";

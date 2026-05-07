@@ -17,3 +17,7 @@ export const logger = {
 export function setDebug(enabled) {
   _debug = !!enabled;
 }
+
+export function isDebug() {
+  return _debug;
+}

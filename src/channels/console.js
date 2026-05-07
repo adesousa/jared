@@ -397,9 +397,7 @@ class ConsoleChannel {
 
     bus.on("task:end", () => {
       this.stopSpinner();
-      if (!this.isStreaming) {
-         this.rl.prompt(true);
-      }
+      // No prompt here, message:send will handle it
     });
 
     bus.on("tool:start", payload => {
@@ -415,11 +413,11 @@ class ConsoleChannel {
         }
       } catch (e) {}
 
-      if (this.isStreaming) {
-        this.lexer.flush();
-        process.stdout.write(`\n\n   ${DIM}[Working] Executing tool: ${toolStr}${RESET}\n\n`);
-      } else {
-        console.log(`   ${DIM}[Working] Executing tool: ${toolStr}${RESET}`);
+        if (this.isStreaming) {
+          this.lexer.flush();
+          process.stdout.write(`\n\n   ${DIM}[Working] Executing tool: ${toolStr}${RESET}\n\n`);
+        } else {
+          console.log(`   ${DIM}[Working] Executing tool: ${toolStr}${RESET}`);
       }
       this.startSpinner("Working...");
     });
