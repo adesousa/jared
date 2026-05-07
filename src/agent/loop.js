@@ -51,7 +51,7 @@ class AgentLoop extends EventEmitter {
         }
         // Handle tool calls
         messages.push(response.message);
-        for (const toolCall of response.tool_calls) {
+        const toolPromises = response.tool_calls.map(async (toolCall) => {
           bus.emit("tool:start", { 
             name: toolCall.function.name, 
             args: toolCall.function.arguments 
@@ -68,13 +68,15 @@ class AgentLoop extends EventEmitter {
               toolCall.function.arguments
             );
           }
-          messages.push({
+          return {
             role: "tool",
             tool_call_id: toolCall.id,
             name: toolCall.function.name,
             content: JSON.stringify(result)
-          });
-        }
+          };
+        });
+        const toolResults = await Promise.all(toolPromises);
+        messages.push(...toolResults);
       }
       const fallbackContent = "I have reached the maximum number of iterations allowed for this task without completing it. Please try refining your request or breaking it down into smaller steps.";
       this.emit("taskCompleted", fallbackContent);
