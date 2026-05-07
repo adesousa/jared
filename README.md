@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="src/assets/jared.jpg" width="400" alt="Jared Logo">
+  <img src="src/assets/jared.jpg" width="100%" alt="Jared Logo">
 </p>
 
 # Jared: The AI COO
@@ -19,13 +19,13 @@ Jared is an **opinionated AGAAS framework** — a ready-to-deploy AI agent that 
 | You ask → it answers → done | Always-on, always listening                                      |
 | Single channel              | Multi-channel simultaneously (Telegram + Slack + WhatsApp + ...) |
 | Stateless or session-scoped | Persistent SQLite memory across all channels                     |
-| No initiative               | Proactive via heartbeat tasks & cron scheduling                  |
+| No initiative               | Proactive via cron scheduling                                    |
 | Extensions require code     | Drop a `SKILL.md` file, restart, done                            |
 | Generic framework           | Opinionated: batteries included, decisions made                  |
 
 ### The AGAAS Philosophy
 
-1. **Agent, not assistant.** Jared doesn't wait passively — it monitors heartbeat tasks, triggers cron jobs, and delivers results to the right channel proactively.
+1. **Agent, not assistant.** Jared doesn't wait passively — it triggers cron jobs and delivers results to the right channel proactively.
 2. **Service, not CLI.** Run it once, connect your channels, and Jared stays alive — handling messages from any source, remembering context across sessions.
 3. **Opinionated, not configurable-to-death.** SQLite for memory (not a vector DB). Markdown for skills (not a plugin SDK). Event bus for routing (not a message queue). Every choice optimizes for simplicity and low token cost.
 4. **Ultra-lightweight by design.** The entire agent core fits in < 3,000 LOC. If you can read JavaScript, you can understand and customize every line.
@@ -33,9 +33,11 @@ Jared is an **opinionated AGAAS framework** — a ready-to-deploy AI agent that 
 ## Key Features
 
 - 🪶 **Ultra-Lightweight**: Core agent logic < 3,000 lines. Just the essentials. No bloat.
+- 🏢 **Multi-Project Support**: Seamlessly manage and switch between multiple isolated projects, each with its own configuration, backlog, and persistent memory database.
 - 🧠 **Bun SQLite Memory**: Uses a robust native SQL memory system with `bun:sqlite` to manage Short-Term Context, Categorized Long-Term Memory (Facts, Preferences, Rules, Summaries), and Cherry-Pick Grep (search) capabilities.
 - 📉 **Native Token-Reduction Strategy**: Drastically reduces token consumption through intelligent context management and selective memory retrieval.
 - 🗺️ **Universal Routing**: Jared automatically handles OpenAI-compatible endpoints (Ollama, vLLM, OpenRouter) and applies native adapter patterns for providers with custom schemas (like Google Gemini).
+- 🤖 **Agent Orchestrator / Dynamic Routing**: Explicitly route any message to a specific provider by appending a flag (e.g., `--openai`, `--gemini`, `--ollama`) to seamlessly switch models mid-conversation.
 - 🔌 **MCP Support**: First-class Node.js implementation of Model Context Protocol for seamless tool extraction from stdio/SSE servers.
 - 🌐 **Web Search & Fetch**: Built-in Brave Search integration and URL content extraction — no external dependencies.
 - 🎯 **Markdown Skills**: Dynamic skill system inspired by Nanobot/OpenClaw — extend Jared by dropping a `SKILL.md` file into `src/skills/`.
@@ -560,7 +562,7 @@ The agent uses the `cron` tool to manage these tasks seamlessly. `One Shot Tasks
 | `jared start <project>`        | Start Jared in interactive mode and connect configured channels   |
 | `jared lines`                  | Check real-time codebase size (ensuring it stays under 3,000 LOC) |
 | `jared reset-memory <project>` | Completely wipe the project's persistent memory database          |
-| `jared stats <project>`        | Show core token usage stats for a project                        |
+| `jared stats <project>`        | Show core token usage stats for a project                         |
 | `jared audit`                  | Run dependency security audit (checks for known vulnerabilities)  |
 
 Interactive mode exits: `exit`, `quit`, or `Ctrl+D`.
