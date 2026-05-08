@@ -36,11 +36,6 @@ class SkillsManager {
         }
       }
     }
-    if (this.skillInstructions.length > 0 && !suppressLog) {
-      console.log(
-        `[Skills] Loaded ${this.skillInstructions.length} skill(s): ${this.skillInstructions.map(s => s.name).join(", ")}`
-      );
-    }
   }
   _parseFrontmatter(content) {
     const match = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
@@ -81,7 +76,6 @@ class SkillsManager {
         if (t && t.schema && t.execute) { this.registerTool(t.schema, (args) => t.execute(args, runtimeContext)); loadedCount++; }
       }
     }
-    if (loadedCount > 0 && !suppressLog) { console.log(`[Tools] Loaded ${loadedCount} dynamic tool(s) from ${toolsDir}`); }
   }
   getTools() { return this.tools; }
   async executeTool(name, argsJson) {
