@@ -214,28 +214,53 @@ class StreamMarkdownLexer {
            colWidths[j] = Math.max(colWidths[j] || 0, visibleLen);
         }
      }
-     let result = "";
+
+     let resultParts = [];
      let top = this.fmt.dim + "┌" + colWidths.map(w => "─".repeat(w + 2)).join("┬") + "┐" + this.getStateFmt() + "\n";
-     result += top;
+     resultParts.push(top);
+
+     const dim = this.fmt.dim;
+     const stateFmt = this.getStateFmt();
+     const bold = this.fmt.bold;
+     const italic = this.fmt.italic;
+     const cyan = this.fmt.cyan;
+
+     const prefix = dim + "│" + stateFmt + " ";
+     const separator = dim + " │" + stateFmt + " ";
+     const suffix = " " + dim + "│" + stateFmt + "\n";
+     const sepBorder = dim + "├" + colWidths.map(w => "─".repeat(w + 2)).join("┼") + "┤" + stateFmt + "\n";
+
      for (let i = 0; i < rows.length; i++) {
-        if (hasSeparator && i === 1) { result += this.fmt.dim + "├" + colWidths.map(w => "─".repeat(w + 2)).join("┼") + "┤" + this.getStateFmt() + "\n"; continue; }
-        let rowStr = this.fmt.dim + "│" + this.getStateFmt() + " ";
+        if (hasSeparator && i === 1) {
+           resultParts.push(sepBorder);
+           continue;
+        }
+
+        let rowParts = [prefix];
         for (let j = 0; j < colWidths.length; j++) {
            let cell = rows[i].cells[j] || "";
            let visibleLen = cell.replace(/\*\*|\*|`/g, '').length;
            let padLen = Math.max(0, colWidths[j] - visibleLen);
            let formattedCell = cell
-              .replace(/\*\*(.*?)\*\*/g, this.fmt.bold + "$1" + this.getStateFmt())
-              .replace(/\*(.*?)\*/g, this.fmt.italic + "$1" + this.getStateFmt())
-              .replace(/`(.*?)`/g, this.fmt.cyan + "$1" + this.getStateFmt());
-           rowStr += formattedCell + " ".repeat(padLen);
-           if (j < colWidths.length - 1) { rowStr += this.fmt.dim + " │" + this.getStateFmt() + " "; } else { rowStr += " " + this.fmt.dim + "│" + this.getStateFmt(); }
+              .replace(/\*\*(.*?)\*\*/g, bold + "$1" + stateFmt)
+              .replace(/\*(.*?)\*/g, italic + "$1" + stateFmt)
+              .replace(/`(.*?)`/g, cyan + "$1" + stateFmt);
+              
+           rowParts.push(formattedCell);
+           if (padLen > 0) rowParts.push(" ".repeat(padLen));
+           
+           if (j < colWidths.length - 1) {
+              rowParts.push(separator);
+           } else {
+              rowParts.push(suffix);
+           }
         }
-        result += rowStr + "\n";
+        resultParts.push(rowParts.join(""));
      }
-     let bottom = this.fmt.dim + "└" + colWidths.map(w => "─".repeat(w + 2)).join("┴") + "┘" + this.getStateFmt() + "\n";
-     result += bottom;
-     return result;
+
+     let bottom = dim + "└" + colWidths.map(w => "─".repeat(w + 2)).join("┴") + "┘" + stateFmt + "\n";
+     resultParts.push(bottom);
+     return resultParts.join("");
   }
 }
 class ConsoleChannel {

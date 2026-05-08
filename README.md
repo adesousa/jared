@@ -567,6 +567,20 @@ The agent uses the `cron` tool to manage these tasks seamlessly. `One Shot Tasks
 
 Interactive mode exits: `exit`, `quit`, or `Ctrl+D`.
 
+## 🚀 Roadmap
+
+We are building Jared to be the ultimate ubiquitous AI partner. Here’s what’s coming next, focused on delivering maximum value to your daily workflow:
+
+1. **Self-Improving Intelligence (Closed Loop)**: Implementing a continuous feedback system where Jared analyzes his own performance to refine skills, optimize tool calls, and improve memory rules—complete with configurable token budget management.
+2. **Expanded Capability Library**: A massive expansion of the built-in `SKILL.md` collection to handle everything from advanced data analysis to deep research and creative workflows.
+3. **Natural Voice Interaction**: A dedicated voice mode for fluid, hands-free communication across mobile and desktop.
+4. **Jared Web Channel**: A sleek web interface (`web.js`) featuring a multi-pane dashboard:
+   - **Left**: Project Switcher
+   - **Right (Tabs)**: Live Conversation, Backlog, and Voice mode.
+5. **Ambient Home Intelligence**: Integration with WiFi speakers and smart home ecosystems, transforming Jared into a proactive physical home assistant.
+6. **Ubiquitous Visual Intelligence**: Connecting with wearable tech (like Ray-Ban Meta glasses) to provide real-time assistance based on what you see.
+7. **Mobile-First Presence**: Native Android integration and Pixel Watch support with "Hey Jared" wake-word triggers for true on-the-go productivity.
+
 ## 🏗️ Architecture Details
 
 Jared utilizes a generalized event bus natively (`EventEmitter`) to bridge decoupled channel connectors (Slack, Telegram, etc.) with the core agent loop. Core configurations are mapped in `config.json`. The engine seamlessly parses incoming instructions, integrates facts via the native SQLite memory tools, executes tools (via direct JS skills or MCP abstractions), and loops until the task is complete before responding to the source channel.

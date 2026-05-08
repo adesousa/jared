@@ -1,5 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { logger } from "../utils/index.js";
+
 class ContextManager {
   constructor(
     memoryManager,
@@ -52,7 +54,7 @@ class ContextManager {
     const workspaceContext =
       this.securityConfig?.restrictToWorkspace &&
       this.securityConfig?.workspaceDir
-        ? `\n## Workspace Info:\nYou are restricted to the following workspace directory: ${this.securityConfig.workspaceDir}\nYou cannot access files outside of this directory.\n`
+        ? `\n## Workspace Info:\nYou are restricted to the following workspace directory: ${this.securityConfig.workspaceDir}\nYou cannot access files outside of this directory except for urls files.\n`
         : "";
     const systemPrompt = `
 ${soulTemplate}
@@ -67,9 +69,13 @@ You have native tools to optimize your performance and persist knowledge:
 - **IMPORTANT**: You MUST use "add_memory" immediately when the user provides facts, preferences, or rules. Do not just acknowledge them in chat; you MUST persist them to your Core Memory database to remember them in future sessions.
 - **Execution**: use "exec" to execute shell commands. This is your primary way to interact with the system. Follow any user-provided rules about command syntax (e.g., DOS vs. Shell).
 - **Web**: use "web_search" and "web_fetch" to look up real-time information, news, or fetch content from links.
+- **read_skill_manual**: use "read_skill_manual" to read the full instructions for any of the skills before using them
+
 ${teamContext}${skillsContext}${mcpContext}
-Proceed with your designated tasks efficiently.
+
+Proceed with the tasks efficiently.
     `.trim();
+    logger.debug(`System Prompt:\n${systemPrompt}`);
     const history = await this.memoryManager.getRecentContext(session_id);
     const messages = [
       { role: "system", content: systemPrompt },

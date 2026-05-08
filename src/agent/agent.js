@@ -27,13 +27,51 @@ class AgentManager {
       securityConfig.workspaceDir = workspaceDir;
     }
 
-    const context = new ContextManager(memory, customSoulPath, isTeamRole, securityConfig);
-    const skills = new SkillsManager(); skills.loadSkillsFromDirectory(path.resolve(process.cwd(), "src", "skills"), true);
+    const context = new ContextManager(
+      memory,
+      customSoulPath,
+      isTeamRole,
+      securityConfig
+    );
+
+    const skills = new SkillsManager();
+    const skillsDir = path.resolve(process.cwd(), "src", "skills");
+    skills.loadSkillsFromDirectory(skillsDir);
+
     const execGuard = new ExecGuard(securityConfig);
     const mcp = new MCPManager(this.config.mcp); await mcp.initialize();
 
-    await skills.loadToolsFromDirectory(path.resolve(process.cwd(), "src", "tools"), { config: this.config, memory, userId, sessionId, channel, execGuard, cronScheduler, bus, agentManager: this, mcp }, true);
-    const provider = new ProviderRouter(this.config, providerOverride, modelOverride);
+    // Initialize MCP early to make it available to dynamic tools
+    const mcp = new MCPManager(this.config.mcp);
+    await mcp.initialize();
+
+    // Dynamic Tool Loading
+    const toolsDir = path.resolve(process.cwd(), "src", "tools");
+    const runtimeContext = {
+      config: this.config,
+      memory,
+      userId,
+      sessionId,
+      channel,
+      execGuard,
+      cronScheduler,
+      bus,
+      agentManager: this,
+      mcp
+    };
+
+    await skills.loadToolsFromDirectory(toolsDir, runtimeContext);
+
+    // === Run agent loop ===
+
+    const provider = new ProviderRouter(
+      this.config,
+      providerOverride,
+      modelOverride
+    );
+
+    let skillsContext = skills.getSkillsContext();
+    let mcpContext = mcp.getMCPContext();
 
     let maxIterations = this.config.agents?.defaults?.maxIterations || 15;
     let actualTaskDescription = taskDescription;

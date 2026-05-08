@@ -40,7 +40,7 @@ class AgentLoop extends EventEmitter {
         if (response.usage) { tokenUsage.promptTokens += response.usage.promptTokens; tokenUsage.completionTokens += response.usage.completionTokens; }
         if (!response.tool_calls || response.tool_calls.length === 0) { this.emit("taskCompleted", response.content); return { content: response.content, usage: tokenUsage }; }
         messages.push(response.message);
-        for (const toolCall of response.tool_calls) {
+        const toolPromises = response.tool_calls.map(async (toolCall) => {
           bus.emit("tool:start", { 
             name: toolCall.function.name, 
             args: toolCall.function.arguments 
@@ -57,15 +57,17 @@ class AgentLoop extends EventEmitter {
               toolCall.function.arguments
             );
           }
-          messages.push({
+          logger.debug(`Tool '${toolCall.function.name}' execution completed.`);
+          logger.debug(`Tool result:`, result);
+          return {
             role: "tool",
             tool_call_id: toolCall.id,
             name: toolCall.function.name,
             content: JSON.stringify(result)
-          });
-          logger.debug(`Tool '${toolCall.function.name}' execution completed.`);
-          logger.debug(`Tool result:`, result);
-        }
+          };
+        });
+        const toolResults = await Promise.all(toolPromises);
+        messages.push(...toolResults);
       }
       const fallbackContent = "I have reached the maximum number of iterations allowed for this task without completing it. Please try refining your request or breaking it down into smaller steps.";
       this.emit("taskCompleted", fallbackContent);

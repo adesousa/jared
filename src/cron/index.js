@@ -18,20 +18,26 @@ class CronScheduler {
     };
     this._idCounter = 1;
   }
-  start(projectName) {
+
+  async start(projectName) {
     this.projectName = projectName;
     this.backlogPath = path.join(process.cwd(), ".jared", projectName, "BACKLOG.md");
     if (this.timer) return;
-    this.loadFromFile();
+    await this.loadFromFile();
     this.timer = setInterval(() => this.tick(), 60000);
   }
-  stop() { if (this.timer) { clearInterval(this.timer); this.timer = null; } }
-  loadFromFile() {
-    if (!fs.existsSync(this.backlogPath)) return;
+
+  stop() {
+    if (this.timer) { clearInterval(this.timer); this.timer = null; }
+  }
+
+  async loadFromFile() {
+    if (!this.backlogPath) return;
     try {
-      const stats = fs.statSync(this.backlogPath);
+      const stats = await fs.promises.stat(this.backlogPath);
       this.lastMtime = stats.mtimeMs;
-      const content = fs.readFileSync(this.backlogPath, "utf8");
+      
+      const content = await fs.promises.readFile(this.backlogPath, "utf8");
       const lines = content.split('\n');
       const newState = {
         "One Shot Tasks": [],
@@ -68,9 +74,14 @@ class CronScheduler {
       }
       this.fileState = newState;
       this._syncJobsFromState();
-    } catch (e) { logger.error("Error loading BACKLOG.md:", e); }
+    } catch (e) {
+      if (e.code !== 'ENOENT') {
+          logger.error("Error loading BACKLOG.md:", e);
+      }
+    }
   }
-  saveToFile() {
+
+  async saveToFile() {
     if (!this.backlogPath) return;
     try {
       const lines = ["# Project Backlog", ""];
@@ -94,9 +105,13 @@ class CronScheduler {
       writeCategory("Weekly Tasks", this.fileState["Weekly Tasks"] || []);
       writeCategory("Monthly Tasks", this.fileState["Monthly Tasks"] || []);
       writeCategory("Product Backlog", this.fileState["Product Backlog"] || [], true);
-      fs.writeFileSync(this.backlogPath, lines.join("\n").replace(/\n{3,}/g, '\n\n'), "utf8");
-      this.lastMtime = fs.statSync(this.backlogPath).mtimeMs;
-    } catch (e) { logger.error("Error saving BACKLOG.md:", e); }
+      
+      await fs.promises.writeFile(this.backlogPath, lines.join("\n").replace(/\n{3,}/g, '\n\n'), "utf8");
+      const stats = await fs.promises.stat(this.backlogPath);
+      this.lastMtime = stats.mtimeMs;
+    } catch (e) {
+       logger.error("Error saving BACKLOG.md:", e);
+    }
   }
   _parseTimeStr(category, timeStr) {
       const t = timeStr.toLowerCase();
@@ -147,14 +162,16 @@ class CronScheduler {
      processCategory("Weekly Tasks");
      processCategory("Monthly Tasks");
   }
-  addJob(category, timeStr, title, description) {
+
+  async addJob(category, timeStr, title, description) {
      if (!this.fileState[category]) this.fileState[category] = [];
      this.fileState[category].push({ timeStr, title, description });
-     this.saveToFile();
-     this.loadFromFile();
+     await this.saveToFile();
+     await this.loadFromFile();
      return true;
   }
-  removeJob(title) {
+
+  async removeJob(title) {
      let removed = false;
      for (const cat of ["One Shot Tasks", "Daily Tasks", "Weekly Tasks", "Monthly Tasks"]) {
          const tasks = this.fileState[cat];
@@ -164,14 +181,31 @@ class CronScheduler {
              if (this.fileState[cat].length < len) removed = true;
          }
      }
-     if (removed) { this.saveToFile(); this.loadFromFile(); }
+     if (removed) {
+         await this.saveToFile();
+         await this.loadFromFile();
+     }
      return removed;
   }
-  listJobs() { return [...this.jobs.values()]; }
-  tick() {
-    if (this.backlogPath && fs.existsSync(this.backlogPath)) {
-        const currentMtime = fs.statSync(this.backlogPath).mtimeMs;
-        if (currentMtime > this.lastMtime) { logger.debug("BACKLOG.md changed manually, reloading..."); this.loadFromFile(); }
+
+  listJobs() {
+      return [...this.jobs.values()];
+  }
+
+  async tick() {
+    if (this.backlogPath) {
+        try {
+            const stats = await fs.promises.stat(this.backlogPath);
+            const currentMtime = stats.mtimeMs;
+            if (currentMtime > this.lastMtime) {
+                logger.debug("BACKLOG.md changed manually, reloading...");
+                await this.loadFromFile();
+            }
+        } catch (e) {
+            if (e.code !== 'ENOENT') {
+                logger.error("Error stat-ing BACKLOG.md in tick:", e);
+            }
+        }
     }
     const now = Date.now();
     const oneShotsToRemove = [];
@@ -196,7 +230,10 @@ class CronScheduler {
             this.fileState["One Shot Tasks"] = tasks.filter(t => !oneShotsToRemove.includes(t.title));
             if (this.fileState["One Shot Tasks"].length < initialLength) changed = true;
         }
-        if (changed) { this.saveToFile(); this.loadFromFile(); }
+        if (changed) {
+            await this.saveToFile();
+            await this.loadFromFile();
+        }
     }
   }
   _matchCron(expr) {
