@@ -20,11 +20,11 @@ class CronScheduler {
     this._idCounter = 1;
   }
 
-  start(projectName) {
+  async start(projectName) {
     this.projectName = projectName;
     this.backlogPath = path.join(process.cwd(), ".jared", projectName, "BACKLOG.md");
     if (this.timer) return;
-    this.loadFromFile();
+    await this.loadFromFile();
     this.timer = setInterval(() => this.tick(), 60000);
   }
 
@@ -32,13 +32,13 @@ class CronScheduler {
     if (this.timer) { clearInterval(this.timer); this.timer = null; }
   }
 
-  loadFromFile() {
-    if (!fs.existsSync(this.backlogPath)) return;
+  async loadFromFile() {
+    if (!this.backlogPath) return;
     try {
-      const stats = fs.statSync(this.backlogPath);
+      const stats = await fs.promises.stat(this.backlogPath);
       this.lastMtime = stats.mtimeMs;
       
-      const content = fs.readFileSync(this.backlogPath, "utf8");
+      const content = await fs.promises.readFile(this.backlogPath, "utf8");
       const lines = content.split('\n');
       
       const newState = {
@@ -98,11 +98,13 @@ class CronScheduler {
       this.fileState = newState;
       this._syncJobsFromState();
     } catch (e) {
-      logger.error("Error loading BACKLOG.md:", e);
+      if (e.code !== 'ENOENT') {
+          logger.error("Error loading BACKLOG.md:", e);
+      }
     }
   }
 
-  saveToFile() {
+  async saveToFile() {
     if (!this.backlogPath) return;
     try {
       const lines = ["# Project Backlog", ""];
@@ -133,8 +135,9 @@ class CronScheduler {
       writeCategory("Monthly Tasks", this.fileState["Monthly Tasks"] || []);
       writeCategory("Product Backlog", this.fileState["Product Backlog"] || [], true);
       
-      fs.writeFileSync(this.backlogPath, lines.join("\n").replace(/\n{3,}/g, '\n\n'), "utf8");
-      this.lastMtime = fs.statSync(this.backlogPath).mtimeMs;
+      await fs.promises.writeFile(this.backlogPath, lines.join("\n").replace(/\n{3,}/g, '\n\n'), "utf8");
+      const stats = await fs.promises.stat(this.backlogPath);
+      this.lastMtime = stats.mtimeMs;
     } catch (e) {
        logger.error("Error saving BACKLOG.md:", e);
     }
@@ -207,15 +210,15 @@ class CronScheduler {
      processCategory("Monthly Tasks");
   }
 
-  addJob(category, timeStr, title, description) {
+  async addJob(category, timeStr, title, description) {
      if (!this.fileState[category]) this.fileState[category] = [];
      this.fileState[category].push({ timeStr, title, description });
-     this.saveToFile();
-     this.loadFromFile();
+     await this.saveToFile();
+     await this.loadFromFile();
      return true;
   }
 
-  removeJob(title) {
+  async removeJob(title) {
      let removed = false;
      for (const cat of ["One Shot Tasks", "Daily Tasks", "Weekly Tasks", "Monthly Tasks"]) {
          const tasks = this.fileState[cat];
@@ -226,8 +229,8 @@ class CronScheduler {
          }
      }
      if (removed) {
-         this.saveToFile();
-         this.loadFromFile();
+         await this.saveToFile();
+         await this.loadFromFile();
      }
      return removed;
   }
@@ -236,12 +239,19 @@ class CronScheduler {
       return [...this.jobs.values()];
   }
 
-  tick() {
-    if (this.backlogPath && fs.existsSync(this.backlogPath)) {
-        const currentMtime = fs.statSync(this.backlogPath).mtimeMs;
-        if (currentMtime > this.lastMtime) {
-            logger.debug("BACKLOG.md changed manually, reloading...");
-            this.loadFromFile();
+  async tick() {
+    if (this.backlogPath) {
+        try {
+            const stats = await fs.promises.stat(this.backlogPath);
+            const currentMtime = stats.mtimeMs;
+            if (currentMtime > this.lastMtime) {
+                logger.debug("BACKLOG.md changed manually, reloading...");
+                await this.loadFromFile();
+            }
+        } catch (e) {
+            if (e.code !== 'ENOENT') {
+                logger.error("Error stat-ing BACKLOG.md in tick:", e);
+            }
         }
     }
   
@@ -281,8 +291,8 @@ class CronScheduler {
             if (this.fileState["One Shot Tasks"].length < initialLength) changed = true;
         }
         if (changed) {
-            this.saveToFile();
-            this.loadFromFile();
+            await this.saveToFile();
+            await this.loadFromFile();
         }
     }
   }
