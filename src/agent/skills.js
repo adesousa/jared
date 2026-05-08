@@ -91,25 +91,34 @@ class SkillsManager {
     if (!fs.existsSync(toolsDir)) return;
 
     const entries = fs.readdirSync(toolsDir, { withFileTypes: true });
-    let loadedCount = 0;
 
-    for (const entry of entries) {
-      if (!entry.isFile() || !entry.name.endsWith(".js")) continue;
+    const importPromises = entries.map(async (entry) => {
+      if (!entry.isFile() || !entry.name.endsWith(".js")) return null;
 
       const toolPath = path.join(toolsDir, entry.name);
       try {
         const module = await import("file://" + toolPath);
-        const toolsToLoad = Array.isArray(module.default) ? module.default : [module.default];
-        
-        for (const t of toolsToLoad) {
-          if (t && t.schema && t.execute) {
-            this.registerTool(t.schema, (args) => t.execute(args, runtimeContext));
-            loadedCount++;
-          }
-        }
+        return { module, toolPath };
       } catch (e) {
         if (!suppressLog) {
           console.warn(`[Tools] Failed to load tool from ${toolPath}: ${e.message}`);
+        }
+        return null;
+      }
+    });
+
+    const results = await Promise.all(importPromises);
+    let loadedCount = 0;
+
+    for (const result of results) {
+      if (!result) continue;
+      const { module } = result;
+      const toolsToLoad = Array.isArray(module.default) ? module.default : [module.default];
+
+      for (const t of toolsToLoad) {
+        if (t && t.schema && t.execute) {
+          this.registerTool(t.schema, (args) => t.execute(args, runtimeContext));
+          loadedCount++;
         }
       }
     }

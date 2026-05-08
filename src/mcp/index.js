@@ -11,59 +11,61 @@ class MCPManager {
   }
 
   async initialize() {
-    for (const [name, serverConfig] of Object.entries(
-      this.config.servers || {}
-    )) {
-      if (serverConfig.enabled === false) {
-        continue;
-      }
-
-      try {
-        let transport;
-        if (serverConfig.command) {
-          transport = new StdioClientTransport({
-            command: serverConfig.command,
-            args: serverConfig.args || [],
-            env: serverConfig.env || process.env
-          });
-        } else if (serverConfig.url) {
-          if (serverConfig.transport === "streamable") {
-            transport = new StreamableHTTPClientTransport(new URL(serverConfig.url), {
-              requestInit: { headers: serverConfig.headers }
-            });
-          } else {
-            transport = new SSEClientTransport(new URL(serverConfig.url), {
-              headers: serverConfig.headers
-            });
-          }
+    const serverPromises = Object.entries(this.config.servers || {}).map(
+      async ([name, serverConfig]) => {
+        if (serverConfig.enabled === false) {
+          return;
         }
 
-        if (transport) {
-          const client = new Client(
-            { name: "jared", version: "1.0.0" },
-            { capabilities: {} }
-          );
-          await client.connect(transport);
-          this.servers.set(name, client);
-
-          // Fetch tools from the connected server
-          const toolsResult = await client.listTools();
-          for (const tool of toolsResult.tools) {
-            this.tools.push({
-              type: "function",
-              function: {
-                name: tool.name, // Will be mapped natively
-                description: tool.description,
-                parameters: tool.inputSchema
-              },
-              _serverName: name // internal reference
+        try {
+          let transport;
+          if (serverConfig.command) {
+            transport = new StdioClientTransport({
+              command: serverConfig.command,
+              args: serverConfig.args || [],
+              env: serverConfig.env || process.env
             });
+          } else if (serverConfig.url) {
+            if (serverConfig.transport === "streamable") {
+              transport = new StreamableHTTPClientTransport(new URL(serverConfig.url), {
+                requestInit: { headers: serverConfig.headers }
+              });
+            } else {
+              transport = new SSEClientTransport(new URL(serverConfig.url), {
+                headers: serverConfig.headers
+              });
+            }
           }
+
+          if (transport) {
+            const client = new Client(
+              { name: "jared", version: "1.0.0" },
+              { capabilities: {} }
+            );
+            await client.connect(transport);
+            this.servers.set(name, client);
+
+            // Fetch tools from the connected server
+            const toolsResult = await client.listTools();
+            for (const tool of toolsResult.tools) {
+              this.tools.push({
+                type: "function",
+                function: {
+                  name: tool.name, // Will be mapped natively
+                  description: tool.description,
+                  parameters: tool.inputSchema
+                },
+                _serverName: name // internal reference
+              });
+            }
+          }
+        } catch (err) {
+          console.error(`Failed to load MCP server ${name}:`, err);
         }
-      } catch (err) {
-        console.error(`Failed to load MCP server ${name}:`, err);
       }
-    }
+    );
+
+    await Promise.all(serverPromises);
   }
   // Return standard tool array without internal properties
   getTools() {

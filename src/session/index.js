@@ -1,3 +1,5 @@
+import crypto from "node:crypto";
+
 class SessionManager {
   constructor() {
     this.sessions = new Map();
@@ -6,7 +8,7 @@ class SessionManager {
   getSessionId(channel, userId) {
     const key = `${channel}:${userId}`;
     if (!this.sessions.has(key)) {
-      const newSessionId = `session-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+      const newSessionId = crypto.randomUUID();
       this.sessions.set(key, newSessionId);
     }
     return this.sessions.get(key);

@@ -2,7 +2,12 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 class ContextManager {
-  constructor(memoryManager, soulPath, isTeamRole = false, securityConfig = {}) {
+  constructor(
+    memoryManager,
+    soulPath,
+    isTeamRole = false,
+    securityConfig = {}
+  ) {
     this.memoryManager = memoryManager;
     this.soulPath = soulPath;
     this.isTeamRole = isTeamRole;
@@ -61,25 +66,33 @@ class ContextManager {
     const coreMemories = await this.memoryManager.getCoreMemories(user_id);
     const teamContext = await this.getTeamContext();
 
-    const workspaceContext = this.securityConfig?.restrictToWorkspace && this.securityConfig?.workspaceDir 
-      ? `\n## Workspace Info:\nYou are restricted to the following workspace directory: ${this.securityConfig.workspaceDir}\nYou cannot access files outside of this directory.\n` 
-      : "";
+    const workspaceContext =
+      this.securityConfig?.restrictToWorkspace &&
+      this.securityConfig?.workspaceDir
+        ? `\n## Workspace Info:\nYou are restricted to the following workspace directory: ${this.securityConfig.workspaceDir}\nYou cannot access files outside of this directory.\n`
+        : "";
 
     // Construct System Prompt
     const systemPrompt = `
 ${soulTemplate}
-## Current System Time:
+
+## Current System Time
 The current local date and time is: ${new Date().toLocaleString()}
 ${workspaceContext}
-## Core Memory (Loaded from SQLite):
-${coreMemories || "No core memory established yet."}
-Proceed with your designated tasks efficiently.
-You have native memory tools to optimize token consumption:
-- use "search_memory" to quickly cherry-pick grep your past conversations (short & long term) when the user references something you don't instantly remember.
-- use "add_memory" and "remove_memory" to curate the "Core Memory" section above. Update these dynamically whenever you learn something permanent about the user or project context. Ensure you select the appropriate \`category\`.
-- use "exec" to execute shell commands when needed by your skills. If restricted to a workspace, your current working directory is the root of your workspace and you cannot traverse above it.
-- use "web_search" and "web_fetch" to look up real-time information, news, or fetch content from links.
+
+## Core Memory (Persistence)
+${coreMemories || "No core memory established yet. Use 'add_memory' to record facts about the user or project."}
+
+## Operational Tools
+You have native tools to optimize your performance and persist knowledge:
+- **Memory**: use "search_memory" to retrieve context from past conversations.
+- **IMPORTANT**: You MUST use "add_memory" immediately when the user provides facts, preferences, or rules. Do not just acknowledge them in chat; you MUST persist them to your Core Memory database to remember them in future sessions.
+- **Execution**: use "exec" to execute shell commands. This is your primary way to interact with the system. Follow any user-provided rules about command syntax (e.g., DOS vs. Shell).
+- **Web**: use "web_search" and "web_fetch" to look up real-time information, news, or fetch content from links.
+
 ${teamContext}${skillsContext}${mcpContext}
+
+Proceed with your designated tasks efficiently.
     `.trim();
     // console.log(systemPrompt);
     const history = await this.memoryManager.getRecentContext(session_id);
