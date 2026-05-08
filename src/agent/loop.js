@@ -2,7 +2,15 @@ import { EventEmitter } from "node:events";
 import bus from "../bus/index.js";
 import { logger } from "../utils/index.js";
 class AgentLoop extends EventEmitter {
-  constructor(context, memory, skills, mcp, provider, maxIterations = 15) {
+  constructor(
+    context,
+    memory,
+    skills,
+    mcp,
+    provider,
+    maxIterations = 15,
+    systemPromptInterval = 5
+  ) {
     super();
     this.context = context;
     this.memory = memory;
@@ -10,6 +18,7 @@ class AgentLoop extends EventEmitter {
     this.mcp = mcp;
     this.provider = provider;
     this.maxIterations = maxIterations;
+    this.systemPromptInterval = systemPromptInterval;
     this.isRunning = false;
   }
   async runTask(
@@ -31,19 +40,41 @@ class AgentLoop extends EventEmitter {
         skillsContext,
         mcpContext
       );
+      // Separate the full system prompt from the rest of the conversation, so we can swap it out on intermediate iterations to save tokens.
+      const fullSystemMessage = messages[0];
+      const slimSystemMessage = {
+        role: "system",
+        content: "Continue the task based on the conversation so far."
+      };
+
       for (let i = 0; i < this.maxIterations; i++) {
+        // Re-inject the full system prompt on iteration 0 and every N iterations. On all other iterations, use a minimal stub to avoid re-sending the entire soul/tools/skills context on every tool-call round-trip.
+        const useFullSystem = i === 0 || i % this.systemPromptInterval === 0;
+        messages[0] = useFullSystem ? fullSystemMessage : slimSystemMessage;
+        if (useFullSystem && i > 0) {
+          logger.debug(
+            `[Loop] Re-injecting full system prompt at iteration ${i}`
+          );
+        }
+
         const response = await this.provider.chat(
           messages,
           this.skills.getTools(),
           onToken
         );
-        if (response.usage) { tokenUsage.promptTokens += response.usage.promptTokens; tokenUsage.completionTokens += response.usage.completionTokens; }
-        if (!response.tool_calls || response.tool_calls.length === 0) { this.emit("taskCompleted", response.content); return { content: response.content, usage: tokenUsage }; }
+        if (response.usage) {
+          tokenUsage.promptTokens += response.usage.promptTokens;
+          tokenUsage.completionTokens += response.usage.completionTokens;
+        }
+        if (!response.tool_calls || response.tool_calls.length === 0) {
+          this.emit("taskCompleted", response.content);
+          return { content: response.content, usage: tokenUsage };
+        }
         messages.push(response.message);
-        const toolPromises = response.tool_calls.map(async (toolCall) => {
-          bus.emit("tool:start", { 
-            name: toolCall.function.name, 
-            args: toolCall.function.arguments 
+        const toolPromises = response.tool_calls.map(async toolCall => {
+          bus.emit("tool:start", {
+            name: toolCall.function.name,
+            args: toolCall.function.arguments
           });
           let result;
           if (this.mcp.hasTool(toolCall.function.name)) {
@@ -69,10 +100,17 @@ class AgentLoop extends EventEmitter {
         const toolResults = await Promise.all(toolPromises);
         messages.push(...toolResults);
       }
-      const fallbackContent = "I have reached the maximum number of iterations allowed for this task without completing it. Please try refining your request or breaking it down into smaller steps.";
+      const fallbackContent =
+        "I have reached the maximum number of iterations allowed for this task without completing it. Please try refining your request or breaking it down into smaller steps.";
       this.emit("taskCompleted", fallbackContent);
       return { content: fallbackContent, usage: tokenUsage };
-    } catch (error) { this.emit("error", error); throw error; } finally { this.isRunning = false; bus.emit("task:end"); }
+    } catch (error) {
+      this.emit("error", error);
+      throw error;
+    } finally {
+      this.isRunning = false;
+      bus.emit("task:end");
+    }
   }
 }
 export default AgentLoop;

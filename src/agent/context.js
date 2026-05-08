@@ -14,6 +14,36 @@ class ContextManager {
     this.isTeamRole = isTeamRole;
     this.securityConfig = securityConfig;
     this.soulCache = null;
+    this.templateCache = new Map();
+  }
+  async _loadTemplate(name, placeholders = {}) {
+    if (this.templateCache.has(name)) {
+      let content = this.templateCache.get(name);
+      for (const [key, value] of Object.entries(placeholders)) {
+        content = content.replace(new RegExp(`{{${key}}}`, "g"), value);
+      }
+      return content;
+    }
+    const templatePath = path.join(
+      process.cwd(),
+      "src",
+      "identity",
+      `${name}.md`
+    );
+    try {
+      const content = await fs.readFile(templatePath, "utf8");
+      this.templateCache.set(name, content);
+      let replaced = content;
+      for (const [key, value] of Object.entries(placeholders)) {
+        replaced = replaced.replace(new RegExp(`{{${key}}}`, "g"), value);
+      }
+      return replaced;
+    } catch (err) {
+      logger.warn(
+        `[Context] Template ${name} not found or unreadable at ${templatePath}`
+      );
+      return "";
+    }
   }
   async loadSoul() {
     if (!this.soulCache) {
@@ -23,8 +53,11 @@ class ContextManager {
           await fs.access(userSoulPath);
           this.soulCache = await fs.readFile(userSoulPath, "utf8");
           return this.soulCache;
-        } catch { } }
-      try { this.soulCache = await fs.readFile(this.soulPath, "utf8"); } catch {
+        } catch {}
+      }
+      try {
+        this.soulCache = await fs.readFile(this.soulPath, "utf8");
+      } catch {
         this.soulCache = this.isTeamRole
           ? "You are a specialized agent."
           : "I am Jared, the AI COO.";
@@ -39,8 +72,12 @@ class ContextManager {
       const roles = files
         .filter(f => f.endsWith(".md"))
         .map(f => f.replace(".md", ""));
-      if (roles.length > 0) { return `\n## Available Team Members (Subagents)\nYou can use the "spawn" tool to delegate tasks to subagents. Available roles: ${roles.join(", ")}\n`; }
-    } catch { } return ""; }
+      if (roles.length > 0) {
+        return await this._loadTemplate("TEAM", { roles: roles.join(", ") });
+      }
+    } catch {}
+    return "";
+  }
   async buildPrompt(
     taskRequest,
     session_id,
@@ -51,27 +88,35 @@ class ContextManager {
     const soulTemplate = await this.loadSoul();
     const coreMemories = await this.memoryManager.getCoreMemories(user_id);
     const teamContext = await this.getTeamContext();
+
     const workspaceContext =
       this.securityConfig?.restrictToWorkspace &&
       this.securityConfig?.workspaceDir
-        ? `\n## Workspace Info:\nYou are restricted to the following workspace directory: ${this.securityConfig.workspaceDir}\nYou cannot access files outside of this directory except for urls files.\n`
+        ? await this._loadTemplate("WORKSPACE", {
+            workspaceDir: this.securityConfig.workspaceDir
+          })
         : "";
+
+    const memoryContext = await this._loadTemplate("MEMORY", {
+      coreMemories:
+        coreMemories ||
+        "No core memory established yet. Use 'add_memory' to record facts about the user or project."
+    });
+
+    const toolsContext = await this._loadTemplate("TOOLS");
+
     const systemPrompt = `
 ${soulTemplate}
 ## Current System Time
 The current local date and time is: ${new Date().toLocaleString()}
-${workspaceContext}
-## Core Memory (Persistence)
-${coreMemories || "No core memory established yet. Use 'add_memory' to record facts about the user or project."}
-## Operational Tools
-You have native tools to optimize your performance and persist knowledge:
-- **Memory**: use "search_memory" to retrieve context from past conversations.
-- **IMPORTANT**: You MUST use "add_memory" immediately when the user provides facts, preferences, or rules. Do not just acknowledge them in chat; you MUST persist them to your Core Memory database to remember them in future sessions.
-- **Execution**: use "exec" to execute shell commands. This is your primary way to interact with the system. Follow any user-provided rules about command syntax (e.g., DOS vs. Shell).
-- **Web**: use "web_search" and "web_fetch" to look up real-time information, news, or fetch content from links.
-- **read_skill_manual**: use "read_skill_manual" to read the full instructions for any of the skills before using them
 
-${teamContext}${skillsContext}${mcpContext}
+${workspaceContext}
+${memoryContext}
+${toolsContext}
+
+${teamContext}
+${skillsContext}
+${mcpContext}
 
 Proceed with the tasks efficiently.
     `.trim();

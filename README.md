@@ -273,18 +273,21 @@ Set your default provider and active model:
       "provider": "ollama",
       "model": "glm-4.6:cloud",
       "thinking": false,
-      "maxIterations": 15
+      "maxIterations": 15,
+      "systemPromptInterval": 5
     }
   }
 }
 ```
 
-| Field           | Description                                                        | Default         |
-| --------------- | ------------------------------------------------------------------ | --------------- |
-| `provider`      | The default LLM provider to use                                    | `ollama`        |
-| `thinking`      | Enable reasoning `<think>` blocks                                  | `true`          |
-| `model`         | The active model for the provider                                  | `glm-4.6:cloud` |
-| `maxIterations` | Max tool-use loops per message (prevents infinite loops/runaway $) | `15`            |
+| Field                  | Description                                                                            | Default         |
+| ---------------------- | -------------------------------------------------------------------------------------- | --------------- |
+| `provider`             | The default LLM provider to use                                                        | `ollama`        |
+| `thinking`             | Enable reasoning `<think>` blocks                                                      | `true`          |
+| `model`                | The active model for the provider                                                      | `glm-4.6:cloud` |
+| `maxIterations`        | Max tool-use loops per message (prevents infinite loops/runaway $)                     | `15`            |
+| `systemPromptInterval` | How often to re-inject the full system prompt during a multi-step task (see [Token Optimization](#token-optimization)) | `5`  |
+
 
 ### Explicit Model Routing
 
@@ -395,6 +398,38 @@ Optionally configure Brave Search for the `web_search` tool:
 ```
 
 > Get a free API key at [brave.com/search/api](https://brave.com/search/api/).
+
+### Token Optimization
+
+Jared's agent loop uses a **sparse system prompt** strategy to reduce token consumption on multi-step tasks.
+
+When a task requires multiple tool calls (e.g., searching the web, reading files, running commands), the agent calls the LLM multiple times in a loop. Without optimization, every call re-sends the full system prompt — soul, skills list, tool instructions, core memory — on every single iteration. This gets expensive fast.
+
+**How it works:**
+
+- **Iteration 0**: Full system prompt sent (soul, tools, skills, core memory, team context)
+- **Iterations 1–N**: A slim stub (`"Continue the task based on the conversation so far."`) is sent instead
+- **Every `systemPromptInterval` iterations**: The full system prompt is re-injected to refresh the model's persona and rules
+
+For a task with 10 tool calls and `systemPromptInterval: 5`, the full system prompt is only sent **twice** (iterations 0 and 5) instead of 10 times — roughly **80–90% fewer system prompt tokens** for complex agentic tasks.
+
+```json
+{
+  "agents": {
+    "defaults": {
+      "systemPromptInterval": 5
+    }
+  }
+}
+```
+
+| Value | Behavior                                                                            |
+| ----- | ----------------------------------------------------------------------------------- |
+| `1`   | Full system prompt on every iteration (original behavior, maximum safety)           |
+| `5`   | Full prompt on iterations 0, 5, 10, ... (default — good balance)                   |
+| `99`  | Full prompt only on iteration 0, never refreshed (maximum savings, best for short focused tasks) |
+
+> When `debug: true` is set, Jared logs `[Loop] Re-injecting full system prompt at iteration N` so you can observe the behavior.
 
 ### Debug
 

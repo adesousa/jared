@@ -2,6 +2,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import fs from "node:fs";
+import path from "node:path";
 class MCPManager {
   constructor(config = {}) {
     this.config = config;
@@ -70,8 +72,20 @@ class MCPManager {
   }
   getMCPContext() {
     if (this.tools.length === 0) return "";
-    const sections = this.tools.map(tool => { const desc = tool.function.description ? tool.function.description : "No description available."; return `- **${tool.function.name}** [from ${tool._serverName}]: ${desc}`; });
-    return `\n## Available MCP Tools\nYou have the following external MCP tools available. Use the \`get_mcp_tool_schema\` tool to read the exact arguments required for any of these tools before using them with \`execute_mcp_tool\`:\n${sections.join("\n")}\n`;
+    const sections = this.tools.map(tool => {
+      const desc = tool.function.description
+        ? tool.function.description
+        : "No description available.";
+      return `- **${tool.function.name}** [from ${tool._serverName}]: ${desc}`;
+    });
+
+    const templatePath = path.join(process.cwd(), "src", "identity", "MCP.md");
+    try {
+      const template = fs.readFileSync(templatePath, "utf8");
+      return template.replace("{{tools}}", sections.join("\n"));
+    } catch (err) {
+      return `\n## Available MCP Tools\nYou have the following external MCP tools available. Use the \`get_mcp_tool_schema\` tool to read the exact arguments required for any of these tools before using them with \`execute_mcp_tool\`:\n${sections.join("\n")}\n`;
+    }
   }
   getToolSchema(name) {
     const toolDef = this.tools.find(t => t.function.name === name);

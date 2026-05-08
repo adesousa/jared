@@ -118,6 +118,7 @@ class AgentManager {
     let mcpContext = mcp.getMCPContext();
 
     let maxIterations = this.config.agents?.defaults?.maxIterations || 15;
+    const systemPromptInterval = this.config.agents?.defaults?.systemPromptInterval ?? 5;
     let actualTaskDescription = taskDescription;
     if (isSubagent) {
       maxIterations = Math.max(1, Math.floor(maxIterations / 2));
@@ -130,7 +131,8 @@ class AgentManager {
       skills,
       mcp,
       provider,
-      maxIterations
+      maxIterations,
+      systemPromptInterval
     );
     const onToken =
       channel === "console" && !isSubagent

@@ -55,8 +55,17 @@ class SkillsManager {
   }
   getSkillsContext() {
     if (this.skillInstructions.length === 0) return "";
-    const sections = this.skillInstructions.map(skill => { return `- **${skill.name}**: ${skill.description ? skill.description : "No description available."}`; });
-    return `\n## Available Skills\nYou have the following skills available. Use the \`read_skill_manual\` tool to read the full instructions for any of these skills before using them:\n${sections.join("\n")}\n`;
+    const sections = this.skillInstructions.map(skill => {
+      return `- **${skill.name}**: ${skill.description ? skill.description : "No description available."}`;
+    });
+
+    const templatePath = path.join(process.cwd(), "src", "identity", "SKILLS.md");
+    try {
+      const template = fs.readFileSync(templatePath, "utf8");
+      return template.replace("{{skills}}", sections.join("\n"));
+    } catch (err) {
+      return `\n## Available Skills\nYou have the following skills available. Use the \`read_skill_manual\` tool to read the full instructions for any of these skills before using them:\n${sections.join("\n")}\n`;
+    }
   }
   async loadToolsFromDirectory(toolsDir, runtimeContext, suppressLog = false) {
     if (!fs.existsSync(toolsDir)) return;
