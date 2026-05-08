@@ -1,7 +1,6 @@
 import { EventEmitter } from "node:events";
 import bus from "../bus/index.js";
 import { logger } from "../utils/index.js";
-
 class AgentLoop extends EventEmitter {
   constructor(context, memory, skills, mcp, provider, maxIterations = 15) {
     super();
@@ -25,7 +24,6 @@ class AgentLoop extends EventEmitter {
     bus.emit("task:start");
     const tokenUsage = { promptTokens: 0, completionTokens: 0 };
     try {
-      // Basic event loop placeholder
       let messages = await this.context.buildPrompt(
         taskRequest,
         session_id,
@@ -33,24 +31,14 @@ class AgentLoop extends EventEmitter {
         skillsContext,
         mcpContext
       );
-      // Loop until task is complete or max iterations reached
       for (let i = 0; i < this.maxIterations; i++) {
         const response = await this.provider.chat(
           messages,
           this.skills.getTools(),
           onToken
         );
-        // Accumulate token usage from each LLM call
-        if (response.usage) {
-          tokenUsage.promptTokens += response.usage.promptTokens;
-          tokenUsage.completionTokens += response.usage.completionTokens;
-        }
-        // Task completed
-        if (!response.tool_calls || response.tool_calls.length === 0) {
-          this.emit("taskCompleted", response.content);
-          return { content: response.content, usage: tokenUsage };
-        }
-        // Handle tool calls
+        if (response.usage) { tokenUsage.promptTokens += response.usage.promptTokens; tokenUsage.completionTokens += response.usage.completionTokens; }
+        if (!response.tool_calls || response.tool_calls.length === 0) { this.emit("taskCompleted", response.content); return { content: response.content, usage: tokenUsage }; }
         messages.push(response.message);
         const toolPromises = response.tool_calls.map(async (toolCall) => {
           bus.emit("tool:start", { 
@@ -84,13 +72,7 @@ class AgentLoop extends EventEmitter {
       const fallbackContent = "I have reached the maximum number of iterations allowed for this task without completing it. Please try refining your request or breaking it down into smaller steps.";
       this.emit("taskCompleted", fallbackContent);
       return { content: fallbackContent, usage: tokenUsage };
-    } catch (error) {
-      this.emit("error", error);
-      throw error;
-    } finally {
-      this.isRunning = false;
-      bus.emit("task:end");
-    }
+    } catch (error) { this.emit("error", error); throw error; } finally { this.isRunning = false; bus.emit("task:end"); }
   }
 }
 export default AgentLoop;

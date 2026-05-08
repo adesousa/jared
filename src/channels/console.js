@@ -2,16 +2,13 @@ import readline from "node:readline";
 import bus from "../bus/index.js";
 import sessionManager from "../session/index.js";
 import { logger } from "../utils/index.js";
-
 const PURPLE = "\x1b[38;5;141m";
 const WHITE = "\x1b[97m";
 const GREEN = "\x1b[32m";
 const DIM = "\x1b[2m";
 const RESET = "\x1b[0m";
 const BOLD = "\x1b[1m";
-
 const BANNER = `${PURPLE}${BOLD}\n     ██╗ █████╗ ██████╗ ███████╗██████╗ \n     ██║██╔══██╗██╔══██╗██╔════╝██╔══██╗\n     ██║███████║██████╔╝█████╗  ██║  ██║\n██   ██║██╔══██║██╔══██╗██╔══╝  ██║  ██║\n╚█████╔╝██║  ██║██║  ██║███████╗██████╔╝\n ╚════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═════╝ \n${RESET}${DIM}  Your AI COO · Type "exit" to quit${RESET}\n`;
-
 class StreamMarkdownLexer {
   constructor(writeFn) {
     this.write = writeFn;
@@ -21,8 +18,6 @@ class StreamMarkdownLexer {
     this.isCodeBlock = false;
     this.inTable = false;
     this.tableLines = [];
-    
-    // ANSI formatters
     this.fmt = {
       reset: RESET,
       bold: BOLD,
@@ -34,10 +29,8 @@ class StreamMarkdownLexer {
       dim: DIM,
       white: WHITE
     };
-
     this.atLineStart = true;
   }
-
   reset() {
      this.buffer = '';
      this.isBold = false;
@@ -48,7 +41,6 @@ class StreamMarkdownLexer {
      this.inTable = false;
      this.tableLines = [];
   }
-
   getStateFmt() {
      let fmt = this.fmt.reset + this.fmt.white;
      if (this.isBold) fmt += this.fmt.bold;
@@ -56,35 +48,20 @@ class StreamMarkdownLexer {
      if (this.isCode) fmt += this.fmt.cyan;
      return fmt;
   }
-
-  push(chunk) {
-    this.buffer += chunk;
-    this.process();
-  }
-
+  push(chunk) { this.buffer += chunk; this.process(); }
   process() {
     let out = "";
     let i = 0;
-
     while (i < this.buffer.length) {
       const char = this.buffer[i];
       const nextChar = this.buffer[i + 1];
-
-      // ------ Table Buffering Logic ------
       if (this.atLineStart && !this.isCodeBlock) {
          let p = i;
          while (p < this.buffer.length && this.buffer[p] === ' ') p++;
-         
-         if (p === this.buffer.length) {
-             break;
-         }
-         
+         if (p === this.buffer.length) { break; }
          if (this.buffer[p] === '|') {
             let nlIndex = this.buffer.indexOf('\n', p);
-            if (nlIndex === -1) {
-               break; 
-            }
-            
+            if (nlIndex === -1) { break;  }
             this.inTable = true;
             const rowStr = this.buffer.slice(i, nlIndex + 1);
             this.tableLines.push(rowStr);
@@ -98,46 +75,25 @@ class StreamMarkdownLexer {
             }
          }
       }
-      // -----------------------------------
-
       if (char === '\n') {
          out += this.fmt.reset + char;
          this.atLineStart = true;
          i++;
-         if (!this.isCodeBlock) {
-             out += this.getStateFmt();
-         } else {
-             out += this.fmt.cyan;
-         }
+         if (!this.isCodeBlock) { out += this.getStateFmt(); } else { out += this.fmt.cyan; }
          continue;
       }
-
       if (this.atLineStart && char === '#') {
          let p = i + 1;
          let hashes = 1;
          while (p < this.buffer.length && this.buffer[p] === '#') { hashes++; p++; }
          if (p < this.buffer.length && (this.buffer[p] === ' ' || this.buffer[p] === '\n')) {
-            if (this.buffer[p] === ' ') {
-              out += this.fmt.magenta + this.fmt.bold + "■ ".repeat(hashes);
-              i = p + 1;
-            } else {
-              out += this.fmt.magenta + this.fmt.bold + "■ ".repeat(hashes);
-              i = p;
-            }
+            if (this.buffer[p] === ' ') { out += this.fmt.magenta + this.fmt.bold + "■ ".repeat(hashes); i = p + 1; } else { out += this.fmt.magenta + this.fmt.bold + "■ ".repeat(hashes); i = p; }
             this.atLineStart = false;
             out += this.fmt.magenta + this.fmt.bold; 
             continue;
-         } else if (p === this.buffer.length) {
-            break; 
-         }
+         } else if (p === this.buffer.length) { break;  }
       }
-
-      if (char === '`' && nextChar === '`' && this.buffer[i+2] === '`') {
-         if (i + 2 >= this.buffer.length) break;
-      } else if (char === '`' && nextChar === '`' && !this.isCodeBlock) {
-         if (i + 2 >= this.buffer.length) break; 
-      }
-
+      if (char === '`' && nextChar === '`' && this.buffer[i+2] === '`') { if (i + 2 >= this.buffer.length) break; } else if (char === '`' && nextChar === '`' && !this.isCodeBlock) { if (i + 2 >= this.buffer.length) break;  }
       if (char === '`' && nextChar === '`' && this.buffer[i+2] === '`') {
          this.isCodeBlock = !this.isCodeBlock;
          out += this.isCodeBlock ? (this.fmt.reset + this.fmt.cyan) : this.getStateFmt();
@@ -145,7 +101,6 @@ class StreamMarkdownLexer {
          this.atLineStart = false;
          continue;
       }
-
       if (char === '`' && !this.isCodeBlock) {
          this.isCode = !this.isCode;
          out += this.getStateFmt();
@@ -153,7 +108,6 @@ class StreamMarkdownLexer {
          this.atLineStart = false;
          continue;
       }
-
       if (char === '*' && nextChar === '*') {
          this.isBold = !this.isBold;
          out += this.getStateFmt();
@@ -161,11 +115,7 @@ class StreamMarkdownLexer {
          this.atLineStart = false;
          continue;
       }
-      
-      if (char === '*' && i + 1 === this.buffer.length) {
-         break;
-      }
-
+      if (char === '*' && i + 1 === this.buffer.length) { break; }
       if (char === '*') {
          if (this.atLineStart && nextChar === ' ') {
             out += this.fmt.green + "● " + this.getStateFmt();
@@ -180,18 +130,14 @@ class StreamMarkdownLexer {
             continue;
          }
       }
-      
       if (this.atLineStart && char === '-') {
          if (nextChar === ' ') {
             out += this.fmt.green + "● " + this.getStateFmt();
             i += 2;
             this.atLineStart = false;
             continue;
-         } else if (i + 1 === this.buffer.length) {
-            break;
-         }
+         } else if (i + 1 === this.buffer.length) { break; }
       }
-
       if (char === '[') {
          out += this.fmt.cyan + char;
          i++;
@@ -216,16 +162,13 @@ class StreamMarkdownLexer {
          this.atLineStart = false;
          continue;
       }
-
       out += char;
       this.atLineStart = false;
       i++;
     }
-
     this.buffer = this.buffer.slice(i);
     if (out) this.write(out);
   }
-
   flush() {
     if (this.buffer) {
        let trimmed = this.buffer.trimStart();
@@ -249,7 +192,6 @@ class StreamMarkdownLexer {
        this.tableLines = [];
     }
   }
-
   formatTable(lines) {
      const rows = [];
      let maxCols = 0;
@@ -261,12 +203,8 @@ class StreamMarkdownLexer {
         maxCols = Math.max(maxCols, cells.length);
         rows.push({ original: line, cells });
      }
-
      let hasSeparator = false;
-     if (rows.length > 1) {
-        hasSeparator = rows[1].cells.every(c => /^[-: ]+$/.test(c) && c.length > 0);
-     }
-
+     if (rows.length > 1) { hasSeparator = rows[1].cells.every(c => /^[-: ]+$/.test(c) && c.length > 0); }
      const colWidths = new Array(maxCols).fill(0);
      for (let i = 0; i < rows.length; i++) {
         if (hasSeparator && i === 1) continue;
@@ -303,7 +241,6 @@ class StreamMarkdownLexer {
            let cell = rows[i].cells[j] || "";
            let visibleLen = cell.replace(/\*\*|\*|`/g, '').length;
            let padLen = Math.max(0, colWidths[j] - visibleLen);
-           
            let formattedCell = cell
               .replace(/\*\*(.*?)\*\*/g, bold + "$1" + stateFmt)
               .replace(/\*(.*?)\*/g, italic + "$1" + stateFmt)
@@ -326,21 +263,18 @@ class StreamMarkdownLexer {
      return resultParts.join("");
   }
 }
-
 class ConsoleChannel {
   constructor(config = {}) {
     this.enabled = config.enabled !== false;
     this.rl = null;
     this.isStreaming = false;
     this.lexer = new StreamMarkdownLexer(chars => process.stdout.write(chars));
-    
     this.spinnerInterval = null;
     this.spinnerFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
     this.spinnerFrameIdx = 0;
     this.activeSubagents = 0;
     this.spinnerText = null;
   }
-
   startSpinner(text = "Thinking...") {
     this.stopSpinner();
     if (!process.stdout.isTTY) return;
@@ -350,7 +284,6 @@ class ConsoleChannel {
       this.spinnerFrameIdx = (this.spinnerFrameIdx + 1) % this.spinnerFrames.length;
     }, 80);
   }
-
   stopSpinner() {
     if (this.spinnerInterval) {
       clearInterval(this.spinnerInterval);
@@ -359,62 +292,32 @@ class ConsoleChannel {
       readline.clearLine(process.stdout, 0);
     }
   }
-
   updatePrompt() {
     if (!this.rl) return;
     const defaultPrompt = `${PURPLE}❯ ${RESET}`;
-    if (this.activeSubagents > 0) {
-      const taskWord = this.activeSubagents === 1 ? 'task' : 'tasks';
-      this.rl.setPrompt(`${DIM}(${this.activeSubagents} active ${taskWord})${RESET} ${defaultPrompt}`);
-    } else {
-      this.rl.setPrompt(defaultPrompt);
-    }
-    // Only refresh if we are currently sitting at the prompt
-    if (!this.isStreaming && !this.spinnerInterval) {
-      this.rl.prompt(true);
-    }
+    if (this.activeSubagents > 0) { const taskWord = this.activeSubagents === 1 ? 'task' : 'tasks'; this.rl.setPrompt(`${DIM}(${this.activeSubagents} active ${taskWord})${RESET} ${defaultPrompt}`); } else { this.rl.setPrompt(defaultPrompt); }
+    if (!this.isStreaming && !this.spinnerInterval) { this.rl.prompt(true); }
   }
-
   start() {
     if (!this.enabled) return;
-
     this.rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
       prompt: `${PURPLE}❯ `
     });
-
     console.log(BANNER);
     this.rl.prompt();
     logger.debug("Console channel interactive interface started.");
-
     bus.on("subagent:start", payload => {
-      if (payload.channel === "console") {
-        this.activeSubagents++;
-        this.updatePrompt();
-      }
+      if (payload.channel === "console") { this.activeSubagents++; this.updatePrompt(); }
     });
-
     bus.on("subagent:end", payload => {
-      if (payload.channel === "console") {
-        this.activeSubagents = Math.max(0, this.activeSubagents - 1);
-        this.updatePrompt();
-      }
+      if (payload.channel === "console") { this.activeSubagents = Math.max(0, this.activeSubagents - 1); this.updatePrompt(); }
     });
-
-    bus.on("task:start", () => {
-      console.log();
-      this.startSpinner("Thinking...");
-    });
-
-    bus.on("task:end", () => {
-      this.stopSpinner();
-      // No prompt here, message:send will handle it
-    });
-
+    bus.on("task:start", () => { console.log(); this.startSpinner("Thinking..."); });
+    bus.on("task:end", () => { this.stopSpinner(); });
     bus.on("tool:start", payload => {
       this.stopSpinner();
-      
       let toolStr = payload.name;
       try {
         const args = typeof payload.args === 'string' ? JSON.parse(payload.args) : payload.args;
@@ -424,31 +327,16 @@ class ConsoleChannel {
           toolStr = `${payload.name} (${val})`;
         }
       } catch (e) {}
-
-        if (this.isStreaming) {
-          this.lexer.flush();
-          process.stdout.write(`\n\n   ${DIM}[Working] Executing tool: ${toolStr}${RESET}\n\n`);
-        } else {
-          console.log(`   ${DIM}[Working] Executing tool: ${toolStr}${RESET}`);
-      }
+        if (this.isStreaming) { this.lexer.flush(); process.stdout.write(`\n\n   ${DIM}[Working] Executing tool: ${toolStr}${RESET}\n\n`); } else { console.log(`   ${DIM}[Working] Executing tool: ${toolStr}${RESET}`); }
       this.startSpinner("Working...");
     });
-
     this.rl.on("line", line => {
       process.stdout.write(RESET);
       const text = line.trim();
       logger.debug(`Received user input from console: "${text}"`);
-      if (!text) {
-        this.rl.prompt();
-        return;
-      }
-      if (text.toLowerCase() === "exit" || text.toLowerCase() === "quit") {
-        console.log(`\n${DIM}Goodbye.${RESET}\n`);
-        process.exit(0);
-      }
+      if (!text) { this.rl.prompt(); return; }
+      if (text.toLowerCase() === "exit" || text.toLowerCase() === "quit") { console.log(`\n${DIM}Goodbye.${RESET}\n`); process.exit(0); }
       const sessionId = sessionManager.getSessionId("console", "local_user");
-
-      // Emit to the core agent loop
       bus.emit("message:received", {
         channel: "console",
         userId: "local_user",
@@ -456,31 +344,22 @@ class ConsoleChannel {
         content: text
       });
     });
-
     bus.on("message:stream", payload => {
       if (payload.channel === "console") {
         this.stopSpinner();
-        if (!this.isStreaming) {
-          process.stdout.write(`\n${BOLD}${WHITE}Jared:${RESET} `);
-          this.isStreaming = true;
-        }
+        if (!this.isStreaming) { process.stdout.write(`\n${BOLD}${WHITE}Jared:${RESET} `); this.isStreaming = true; }
         this.lexer.push(payload.token);
       }
     });
-    // Listen for responses back from Jared destined for the console
     bus.on("message:send", payload => {
       if (payload.channel === "console") {
         logger.debug(`Sending response to console (Tokens: ${payload.usage ? JSON.stringify(payload.usage) : "N/A"}).`);
         this.stopSpinner();
-        if (!this.isStreaming) {
-          process.stdout.write(`\n${BOLD}${WHITE}Jared:${RESET} `);
-          this.lexer.push(payload.content);
-        }
+        if (!this.isStreaming) { process.stdout.write(`\n${BOLD}${WHITE}Jared:${RESET} `); this.lexer.push(payload.content); }
         this.lexer.flush();
         this.lexer.reset();
         process.stdout.write("\n"); // Final newline to close the stream block
         this.isStreaming = false;
-        // Display token usage if available
         if (payload.usage) {
           const { promptTokens, completionTokens } = payload.usage;
           const total = promptTokens + completionTokens;
@@ -489,19 +368,11 @@ class ConsoleChannel {
             `${DIM}${GREEN}   ⟡ ${promptTokens.toLocaleString()} input · ${completionTokens.toLocaleString()} output · ${total.toLocaleString()} total tokens${RESET}`
           );
         }
-        // blank line before prompt
         console.log();
         this.rl.prompt();
       }
     });
-
-    this.rl.on("close", () => {
-      console.log(`\n${DIM}Goodbye.${RESET}\n`);
-      process.exit(0);
-    });
-
-    // Expose readline question prompt to other components (like ExecGuard) 
-    // to prevent double-echo bugs caused by multiple interfaces on process.stdin
+    this.rl.on("close", () => { console.log(`\n${DIM}Goodbye.${RESET}\n`); process.exit(0); });
     bus.on("console:question", payload => {
       this.stopSpinner();
       payload.handled = true;
@@ -513,5 +384,4 @@ class ConsoleChannel {
     });
   }
 }
-
 export default ConsoleChannel;

@@ -2,7 +2,6 @@ import fs from "node:fs";
 import path from "node:path";
 import bus from "../bus/index.js";
 import { logger } from "../utils/index.js";
-
 class CronScheduler {
   constructor() {
     this.jobs = new Map();
@@ -40,7 +39,6 @@ class CronScheduler {
       
       const content = await fs.promises.readFile(this.backlogPath, "utf8");
       const lines = content.split('\n');
-      
       const newState = {
         "One Shot Tasks": [],
         "Daily Tasks": [],
@@ -48,25 +46,16 @@ class CronScheduler {
         "Monthly Tasks": [],
         "Product Backlog": []
       };
-      
       let currentCategory = null;
       let currentTask = null;
-      
       for (const line of lines) {
         if (line.startsWith("## ")) {
           currentCategory = line.substring(3).trim();
           currentTask = null;
-          if (!newState[currentCategory]) {
-             newState[currentCategory] = [];
-          }
+          if (!newState[currentCategory]) { newState[currentCategory] = []; }
           continue;
         }
-        
-        if (currentCategory === "Product Backlog" && line.trim().startsWith("-")) {
-           newState[currentCategory].push(line);
-           continue;
-        }
-        
+        if (currentCategory === "Product Backlog" && line.trim().startsWith("-")) { newState[currentCategory].push(line); continue; }
         if (line.startsWith("### ")) {
           const header = line.substring(4).trim();
           const tagMatch = header.match(/^(?:⏰|📅)\s*(.*?)\s*[—\-]\s*(.*)$/);
@@ -77,24 +66,12 @@ class CronScheduler {
             newState[currentCategory].push(currentTask);
           } else {
              const oldMatch = header.match(/^(.*?)\s*[—\-]\s*(.*)$/);
-             if (oldMatch) {
-                 currentTask = { timeStr: oldMatch[1].trim(), title: oldMatch[2].trim(), description: [] };
-                 newState[currentCategory].push(currentTask);
-             } else {
-                 currentTask = { timeStr: "09:00", title: header, description: [] };
-                 newState[currentCategory].push(currentTask);
-             }
+             if (oldMatch) { currentTask = { timeStr: oldMatch[1].trim(), title: oldMatch[2].trim(), description: [] }; newState[currentCategory].push(currentTask); } else { currentTask = { timeStr: "09:00", title: header, description: [] }; newState[currentCategory].push(currentTask); }
           }
           continue;
         }
-        
-        if (currentTask && line.trim() !== "" && !line.startsWith("#")) {
-           currentTask.description.push(line);
-        } else if (currentCategory && !currentTask && line.trim() !== "" && !line.startsWith("#") && currentCategory !== "Product Backlog") {
-           newState[currentCategory].push({ timeStr: "09:00", title: "Task", description: [line] });
-        }
+        if (currentTask && line.trim() !== "" && !line.startsWith("#")) { currentTask.description.push(line); } else if (currentCategory && !currentTask && line.trim() !== "" && !line.startsWith("#") && currentCategory !== "Product Backlog") { newState[currentCategory].push({ timeStr: "09:00", title: "Task", description: [line] }); }
       }
-      
       this.fileState = newState;
       this._syncJobsFromState();
     } catch (e) {
@@ -108,27 +85,21 @@ class CronScheduler {
     if (!this.backlogPath) return;
     try {
       const lines = ["# Project Backlog", ""];
-      
       const writeCategory = (catName, tasks, isBacklog = false) => {
           lines.push(`## ${catName}`);
           if (isBacklog) {
-              for (const line of tasks) {
-                  lines.push(line);
-              }
+              for (const line of tasks) { lines.push(line); }
           } else {
               const tag = catName === "One Shot Tasks" ? "📅" : "⏰";
               for (const task of tasks) {
                   lines.push(`### ${tag} ${task.timeStr} — ${task.title}`);
-                  for (const desc of task.description) {
-                      lines.push(desc);
-                  }
+                  for (const desc of task.description) { lines.push(desc); }
                   lines.push("");
               }
           }
           if (!isBacklog && tasks.length === 0) lines.push("");
           else if (isBacklog) lines.push("");
       };
-      
       writeCategory("One Shot Tasks", this.fileState["One Shot Tasks"] || []);
       writeCategory("Daily Tasks", this.fileState["Daily Tasks"] || []);
       writeCategory("Weekly Tasks", this.fileState["Weekly Tasks"] || []);
@@ -142,49 +113,32 @@ class CronScheduler {
        logger.error("Error saving BACKLOG.md:", e);
     }
   }
-
   _parseTimeStr(category, timeStr) {
       const t = timeStr.toLowerCase();
-      
-      if (category === "One Shot Tasks") {
-          const d = new Date(timeStr);
-          if (!isNaN(d.getTime())) return { kind: "at", atMs: d.getTime() };
-      }
-      
+      if (category === "One Shot Tasks") { const d = new Date(timeStr); if (!isNaN(d.getTime())) return { kind: "at", atMs: d.getTime() }; }
       const timeMatch = t.match(/(\d{1,2}):(\d{2})/);
       const hour = timeMatch ? parseInt(timeMatch[1], 10) : 9;
       const minute = timeMatch ? parseInt(timeMatch[2], 10) : 0;
-      
-      if (category === "Daily Tasks") {
-          return { kind: "cron", cronExpr: `${minute} ${hour} * * *` };
-      }
-      
+      if (category === "Daily Tasks") { return { kind: "cron", cronExpr: `${minute} ${hour} * * *` }; }
       if (category === "Weekly Tasks") {
           const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
           const frenchDays = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
           let dayIndex = 1;
           for (let i = 0; i < days.length; i++) {
-              if (t.includes(days[i]) || t.includes(frenchDays[i])) {
-                  dayIndex = i;
-                  break;
-              }
+              if (t.includes(days[i]) || t.includes(frenchDays[i])) { dayIndex = i; break; }
           }
           return { kind: "cron", cronExpr: `${minute} ${hour} * * ${dayIndex}` };
       }
-      
       if (category === "Monthly Tasks") {
           const dayMatch = t.match(/(\d{1,2})(?:st|nd|rd|th|er|ème)/i) || t.match(/(?:le\s)?(\d{1,2})\b/i);
           const dom = dayMatch ? parseInt(dayMatch[1], 10) : 1;
           return { kind: "cron", cronExpr: `${minute} ${hour} ${dom} * *` };
       }
-      
       return { kind: "cron", cronExpr: `0 9 * * *` };
   }
-
   _syncJobsFromState() {
      const oldJobs = Array.from(this.jobs.values());
      this.jobs.clear();
-     
      const processCategory = (catName) => {
         const tasks = this.fileState[catName] || [];
         for (const task of tasks) {
@@ -203,7 +157,6 @@ class CronScheduler {
             this.jobs.set(id, job);
         }
      };
-     
      processCategory("One Shot Tasks");
      processCategory("Daily Tasks");
      processCategory("Weekly Tasks");
@@ -254,34 +207,21 @@ class CronScheduler {
             }
         }
     }
-  
     const now = Date.now();
     const oneShotsToRemove = [];
     const currentJobs = Array.from(this.jobs.values());
-    
     for (const job of currentJobs) {
       let shouldFire = false;
-      if (job.kind === "at" && now >= job.atMs) {
-        shouldFire = true;
-      } else if (job.kind === "cron") {
-        shouldFire = this._matchCron(job.cronExpr);
-      }
-      
+      if (job.kind === "at" && now >= job.atMs) { shouldFire = true; } else if (job.kind === "cron") { shouldFire = this._matchCron(job.cronExpr); }
       if (shouldFire && now - job.lastRun > 60000) {
         job.lastRun = now;
-        
         const realJob = this.jobs.get(job.id);
         if (realJob) realJob.lastRun = now;
-        
         logger.debug(`Cron firing: [${job.category}] ${job.title}`);
         bus.emit("cron:trigger", { tasks: [job.message], timestamp: now });
-        
-        if (job.category === "One Shot Tasks") {
-            oneShotsToRemove.push(job.title);
-        }
+        if (job.category === "One Shot Tasks") { oneShotsToRemove.push(job.title); }
       }
     }
-    
     if (oneShotsToRemove.length > 0) {
         let changed = false;
         const tasks = this.fileState["One Shot Tasks"];
@@ -296,7 +236,6 @@ class CronScheduler {
         }
     }
   }
-
   _matchCron(expr) {
     const parts = expr.split(/\s+/);
     if (parts.length !== 5) return false;
@@ -311,5 +250,4 @@ class CronScheduler {
     });
   }
 }
-
 export default new CronScheduler();

@@ -15,23 +15,16 @@ class ContextManager {
     this.securityConfig = securityConfig;
     this.soulCache = null;
   }
-
   async loadSoul() {
     if (!this.soulCache) {
       if (!this.isTeamRole) {
-        // Prioritize user-level soul (.jared/SOUL.md) over default template
         const userSoulPath = path.join(process.cwd(), ".jared", "SOUL.md");
         try {
           await fs.access(userSoulPath);
           this.soulCache = await fs.readFile(userSoulPath, "utf8");
           return this.soulCache;
-        } catch {
-          // Fall through
-        }
-      }
-      try {
-        this.soulCache = await fs.readFile(this.soulPath, "utf8");
-      } catch {
+        } catch { } }
+      try { this.soulCache = await fs.readFile(this.soulPath, "utf8"); } catch {
         this.soulCache = this.isTeamRole
           ? "You are a specialized agent."
           : "I am Jared, the AI COO.";
@@ -39,7 +32,6 @@ class ContextManager {
     }
     return this.soulCache;
   }
-
   async getTeamContext() {
     try {
       const teamDir = path.join(process.cwd(), "src", "team");
@@ -47,15 +39,8 @@ class ContextManager {
       const roles = files
         .filter(f => f.endsWith(".md"))
         .map(f => f.replace(".md", ""));
-      if (roles.length > 0) {
-        return `\n## Available Team Members (Subagents)\nYou can use the "spawn" tool to delegate tasks to subagents. Available roles: ${roles.join(", ")}\n`;
-      }
-    } catch {
-      // Ignore if directory doesn't exist
-    }
-    return "";
-  }
-
+      if (roles.length > 0) { return `\n## Available Team Members (Subagents)\nYou can use the "spawn" tool to delegate tasks to subagents. Available roles: ${roles.join(", ")}\n`; }
+    } catch { } return ""; }
   async buildPrompt(
     taskRequest,
     session_id,
@@ -66,24 +51,18 @@ class ContextManager {
     const soulTemplate = await this.loadSoul();
     const coreMemories = await this.memoryManager.getCoreMemories(user_id);
     const teamContext = await this.getTeamContext();
-
     const workspaceContext =
       this.securityConfig?.restrictToWorkspace &&
       this.securityConfig?.workspaceDir
         ? `\n## Workspace Info:\nYou are restricted to the following workspace directory: ${this.securityConfig.workspaceDir}\nYou cannot access files outside of this directory except for urls files.\n`
         : "";
-
-    // Construct System Prompt
     const systemPrompt = `
 ${soulTemplate}
-
 ## Current System Time
 The current local date and time is: ${new Date().toLocaleString()}
 ${workspaceContext}
-
 ## Core Memory (Persistence)
 ${coreMemories || "No core memory established yet. Use 'add_memory' to record facts about the user or project."}
-
 ## Operational Tools
 You have native tools to optimize your performance and persist knowledge:
 - **Memory**: use "search_memory" to retrieve context from past conversations.
@@ -103,9 +82,7 @@ Proceed with the tasks efficiently.
       ...history,
       { role: "user", content: taskRequest }
     ];
-
     return messages;
   }
 }
-
 export default ContextManager;
