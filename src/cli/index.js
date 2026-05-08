@@ -344,7 +344,7 @@ async function main() {
           prompt,
           null,
           "cron",
-          "system",
+          "local_user",
           "cron"
         );
         if (result.content && result.content.trim() !== "") {

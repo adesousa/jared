@@ -95,7 +95,7 @@ class AgentManager {
 
     const skills = new SkillsManager();
     const skillsDir = path.resolve(process.cwd(), "src", "skills");
-    skills.loadSkillsFromDirectory(skillsDir, true);
+    skills.loadSkillsFromDirectory(skillsDir);
 
     const execGuard = new ExecGuard(securityConfig);
 
@@ -118,7 +118,7 @@ class AgentManager {
       mcp
     };
 
-    await skills.loadToolsFromDirectory(toolsDir, runtimeContext, true);
+    await skills.loadToolsFromDirectory(toolsDir, runtimeContext);
 
     // === Run agent loop ===
 

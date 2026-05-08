@@ -1,6 +1,6 @@
 ---
 name: monitoring
-description: Monitor environment health by checking URLs with curl and analyzing failures with LLM.
+description: Monitor environment health by checking URLs with 'curl -o /dev/null --max-time 5 -s -w "%{http_code}\n"' and analyzing failures with LLM.
 ---
 
 # Monitoring
@@ -12,15 +12,15 @@ Monitor the health status of environments by performing HTTP checks on provided 
 Check a single environment:
 
 ```bash
-curl -s "https://api.example.com/health"
+curl -o /dev/null --max-time 5 -s -w "%{http_code}\n" "https://api.example.com/health"
 ```
 
 ## How It Works
 
 1. **Health Check**: Performs a silent curl request (`curl -s`) to the environment URL
 2. **Status Detection**:
-      - ✅ **Healthy**: No stderr output = HTTP 200 (success)
-      - ❌ **Unhealthy**: stderr output or timeout = error state
+         - ✅ **Healthy**: No stderr output = HTTP 200 (success)
+         - ❌ **Unhealthy**: stderr output or timeout = error state
 3. **Analysis**: On failure, sends error details to LLM for diagnosis and solutions
 4. **Reporting**: Displays results in consistent emoji-based format
 
@@ -61,16 +61,16 @@ When monitoring an environment, provide:
 ### Monitor Production API
 
 ```bash
-curl -s "https://api.production.com/health"
+curl -o /dev/null --max-time 5 -s -w "%{http_code}\n" "https://api.production.com/health"
 ```
 
 ### Monitor with Timeout
 
-The skill automatically applies a 2-second timeout to prevent hanging:
+The skill automatically applies a 5-second timeout to prevent hanging:
 
 ```bash
-curl -s "https://slow-service.example.com/status"
-# Will timeout and trigger LLM analysis if no response within 2s
+curl -o /dev/null --max-time 5 -s -w "%{http_code}\n" "https://slow-service.example.com/status"
+# Will timeout and trigger LLM analysis if no response within 5s
 ```
 
 ### Monitor Multiple Environments
@@ -78,9 +78,9 @@ curl -s "https://slow-service.example.com/status"
 Check each environment sequentially:
 
 ```bash
-curl -s "https://api.prod.com/health"
-curl -s "https://api.staging.com/health"
-curl -s "https://api.dev.com/health"
+curl -o /dev/null --max-time 5 -s -w "%{http_code}\n" "https://api.prod.com/health"
+curl -o /dev/null --max-time 5 -s -w "%{http_code}\n" "https://api.staging.com/health"
+curl -o /dev/null --max-time 5 -s -w "%{http_code}\n" "https://api.dev.com/health"
 ```
 
 ## LLM Analysis
@@ -102,7 +102,5 @@ The LLM provides:
 ## Tips
 
 - Always provide the full URL including protocol (`https://` or `http://`)
-- Use health check endpoints when available (e.g., `/health`, `/status`, `/ping`)
-- Monitor critical services regularly to catch issues early
 - Review LLM analysis to understand recurring failure patterns
 - Check network connectivity if multiple environments fail simultaneously

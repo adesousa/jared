@@ -122,10 +122,6 @@ class SkillsManager {
         }
       }
     }
-
-    if (loadedCount > 0 && !suppressLog) {
-      console.log(`[Tools] Loaded ${loadedCount} dynamic tool(s) from ${toolsDir}`);
-    }
   }
 
   getTools() {

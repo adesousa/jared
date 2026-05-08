@@ -62,12 +62,18 @@ class MemoryManager {
   async getCoreMemories(user_id) {
     const rows = this.db.prepare("SELECT id, content, category FROM facts WHERE user_id = ? ORDER BY timestamp ASC").all(user_id);
     const cats = { fact: [], preference: [], rule: [], summary: [] };
-    for (const r of rows) { cats[cats[r.category] ? r.category : "fact"].push(`[ID: ${r.id}] ${r.content}`); }
+    
+    for (const r of rows) {
+      const category = (r.category in cats) ? r.category : "fact";
+      cats[category].push(`[ID: ${r.id}] ${r.content}`);
+    }
+
     let out = "";
-    if (cats.fact.length > 0) { out += `### Facts\n${cats.fact.join("\n")}\n\n`; }
-    if (cats.preference.length > 0) { out += `### Preferences\n${cats.preference.join("\n")}\n\n`; }
-    if (cats.rule.length > 0) { out += `### Rules\n${cats.rule.join("\n")}\n\n`; }
-    if (cats.summary.length > 0) { out += `### Summaries\n${cats.summary.join("\n")}\n\n`; }
+    if (cats.fact.length > 0) out += `### Facts\n${cats.fact.join("\n")}\n\n`;
+    if (cats.preference.length > 0) out += `### Preferences\n${cats.preference.join("\n")}\n\n`;
+    if (cats.rule.length > 0) out += `### Rules\n${cats.rule.join("\n")}\n\n`;
+    if (cats.summary.length > 0) out += `### Summaries\n${cats.summary.join("\n")}\n\n`;
+    
     return out.trim();
   }
   async addCoreMemory(user_id, content, category = "fact") {
