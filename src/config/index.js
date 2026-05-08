@@ -1,6 +1,5 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-
 class ConfigManager {
   constructor(projectName) {
     if (!projectName) throw new Error("ConfigManager requires a projectName");
@@ -8,11 +7,8 @@ class ConfigManager {
     this.configPath = path.join(process.cwd(), ".jared", projectName, "config.json");
     this.config = {};
   }
-
   async load() {
-    try {
-      this.config = JSON.parse(await fs.readFile(this.configPath, "utf8"));
-    } catch (err) {
+    try { this.config = JSON.parse(await fs.readFile(this.configPath, "utf8")); } catch (err) {
       if (err.code !== "ENOENT") { throw new Error(`Failed to read config: ${err.message}`); }
       await fs.mkdir(path.dirname(this.configPath), { recursive: true });
       this.config = this._getDefaults();
@@ -21,39 +17,15 @@ class ConfigManager {
     this.config.projectName = this.projectName;
     return this.config;
   }
-
-  get(keyPath) {
-    return keyPath.split(".").reduce((acc, part) => acc && acc[part], this.config);
-  }
-
-  async refresh() {
-    this.config = this._deepMerge(this._getDefaults(), this.config);
-    return await this._save();
-  }
-
-  async reset() {
-    this.config = this._getDefaults();
-    return await this._save();
-  }
-
-  async _save() {
-    await fs.writeFile(this.configPath, JSON.stringify(this.config, null, 2), "utf8");
-    return this.config;
-  }
-
+  get(keyPath) { return keyPath.split(".").reduce((acc, part) => acc && acc[part], this.config); }
+  async refresh() { this.config = this._deepMerge(this._getDefaults(), this.config); return await this._save(); }
+  async reset() { this.config = this._getDefaults(); return await this._save(); }
+  async _save() { await fs.writeFile(this.configPath, JSON.stringify(this.config, null, 2), "utf8"); return this.config; }
   _deepMerge(target, source) {
     const result = { ...target };
-    for (const key of Object.keys(source)) {
-      if (source[key] && typeof source[key] === "object" && !Array.isArray(source[key]) && 
-          target[key] && typeof target[key] === "object" && !Array.isArray(target[key])) {
-        result[key] = this._deepMerge(target[key], source[key]);
-      } else {
-        result[key] = source[key];
-      }
-    }
+    for (const key of Object.keys(source)) { if (source[key] && typeof source[key] === "object" && !Array.isArray(source[key]) &&  target[key] && typeof target[key] === "object" && !Array.isArray(target[key])) { result[key] = this._deepMerge(target[key], source[key]); } else { result[key] = source[key]; } }
     return result;
   }
-
   _getDefaults() {
     return {
       providers: {
@@ -75,10 +47,7 @@ class ConfigManager {
       },
       security: {
         restrictToWorkspace: false, workspaceDir: `.jared/${this.projectName}/workspace`,
-        exec: {
-          mode: "confirm",
-          allowedBins: ["curl", "gh", "summarize", "crontab", "echo", "cat", "grep", "head", "tail", "wc", "date", "uname", "whoami", "pwd", "ls", "find", "jq", "sort", "uniq", "awk", "sed", "tr", "npx", "node", "bun", "python3", "python", "git", "mkdir", "touch", "cp"]
-        }
+        exec: { mode: "confirm", allowedBins: ["curl", "gh", "summarize", "crontab", "echo", "cat", "grep", "head", "tail", "wc", "date", "uname", "whoami", "pwd", "ls", "find", "jq", "sort", "uniq", "awk", "sed", "tr", "npx", "node", "bun", "python3", "python", "git", "mkdir", "touch", "cp"] }
       },
       soulPath: path.resolve(process.cwd(), ".jared", this.projectName, "SOUL.md"),
       memoryPath: path.resolve(process.cwd(), ".jared", this.projectName, "memory.db"),
@@ -86,5 +55,4 @@ class ConfigManager {
     };
   }
 }
-
 export default ConfigManager;

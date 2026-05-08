@@ -20,26 +20,14 @@ export default {
       if (jobs.length === 0) return "No scheduled jobs in BACKLOG.md.";
       return "Scheduled jobs:\n" + jobs.map(j => `- [${j.category}] ${j.title} (Time: ${j.timeStr || j.cronExpr || new Date(j.atMs).toLocaleString()})`).join("\n");
     }
-    
-    if (action === "remove") {
-      if (!title) return "Error: title is required for remove";
-      return cronScheduler.removeJob(title) ? `Removed task '${title}' from BACKLOG.md` : `Task '${title}' not found`;
-    }
-    
+    if (action === "remove") { if (!title) return "Error: title is required for remove"; return cronScheduler.removeJob(title) ? `Removed task '${title}' from BACKLOG.md` : `Task '${title}' not found`; }
     if (action === "add") {
-      if (!category || !time_spec || !title) {
-         return "Error: category, time_spec, and title are required for add";
-      }
-      
+      if (!category || !time_spec || !title) { return "Error: category, time_spec, and title are required for add"; }
       let descLines = [];
-      if (description) {
-         descLines = description.split('\n').map(l => l.trim().startsWith('-') ? l.trim() : `- ${l.trim()}`);
-      }
+      if (description) { descLines = description.split('\n').map(l => l.trim().startsWith('-') ? l.trim() : `- ${l.trim()}`); }
       cronScheduler.addJob(category, time_spec, title, descLines);
-      
       return `Added task '${title}' to '${category}' in BACKLOG.md`;
     }
-    
     return `Unknown action: ${action}`;
   }
 };

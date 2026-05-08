@@ -1,15 +1,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-
 export default {
   schema: {
     name: "read_skill_manual",
     description: "Read the full markdown instructions from a skill's manual by providing its exact name.",
     parameters: {
       type: "object",
-      properties: {
-        skill_name: { type: "string", description: "The exact name of the skill (e.g., 'Docker')" }
-      },
+      properties: { skill_name: { type: "string", description: "The exact name of the skill (e.g., 'Docker')" } },
       required: ["skill_name"]
     }
   },
@@ -17,12 +14,7 @@ export default {
     try {
       const skillsDir = path.resolve(process.cwd(), "src", "skills");
       let entries;
-      try {
-        entries = await fs.readdir(skillsDir, { withFileTypes: true });
-      } catch {
-        return `Error: Skills directory not found.`;
-      }
-
+      try { entries = await fs.readdir(skillsDir, { withFileTypes: true }); } catch { return `Error: Skills directory not found.`; }
       for (const entry of entries) {
         if (!entry.isDirectory()) continue;
         const skillPath = path.join(skillsDir, entry.name, "SKILL.md");
@@ -38,21 +30,14 @@ export default {
                 if (key === "name") {
                   let val = line.substring(colonIdx + 1).trim();
                   if (/^["'].*["']$/.test(val)) val = val.slice(1, -1);
-                  if (val === skill_name) {
-                    return `### Skill Manual: ${skill_name}\n\n${content}`;
-                  }
+                  if (val === skill_name) { return `### Skill Manual: ${skill_name}\n\n${content}`; }
                 }
               }
             }
           }
-        } catch {
-          // Ignore read errors for individual skills
-          continue;
-        }
+        } catch { continue; }
       }
       return `Error: Skill manual for '${skill_name}' not found. Please ensure you supply the exact name listed in Available Skills.`;
-    } catch (e) {
-      return `Error reading skill manual: ${e.message}`;
-    }
+    } catch (e) { return `Error reading skill manual: ${e.message}`; }
   }
 };

@@ -13,10 +13,7 @@ export default [
       description: "Store a long-term memory about the user or project. Categories: fact (verified info), preference (tastes/likes), rule (behavioral directives from user), summary (conversation/context summaries).",
       parameters: {
         type: "object",
-        properties: {
-          content: { type: "string", description: "The memory to store" },
-          category: { type: "string", enum: ["fact", "preference", "rule", "summary"], description: "Memory category" }
-        },
+        properties: { content: { type: "string", description: "The memory to store" }, category: { type: "string", enum: ["fact", "preference", "rule", "summary"], description: "Memory category" } },
         required: ["content", "category"]
       }
     },

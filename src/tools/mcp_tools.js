@@ -6,10 +6,7 @@ export default [
       parameters: {
         type: "object",
         properties: {
-          tool_name: {
-            type: "string",
-            description: "The exact name of the MCP tool to inspect."
-          }
+          tool_name: { type: "string", description: "The exact name of the MCP tool to inspect." }
         },
         required: ["tool_name"]
       }
@@ -17,10 +14,8 @@ export default [
     execute: async (args, context) => {
       const mcp = context.mcp;
       if (!mcp) return "Error: MCP Manager is not available.";
-      
       const schema = mcp.getToolSchema(args.tool_name);
       if (!schema) return `Error: MCP tool '${args.tool_name}' not found.`;
-      
       return JSON.stringify(schema, null, 2);
     }
   },
@@ -31,14 +26,8 @@ export default [
       parameters: {
         type: "object",
         properties: {
-          tool_name: {
-            type: "string",
-            description: "The exact name of the MCP tool to execute."
-          },
-          arguments_json: {
-            type: "string",
-            description: "The JSON-stringified arguments object matching the tool's schema."
-          }
+          tool_name: { type: "string", description: "The exact name of the MCP tool to execute." },
+          arguments_json: { type: "string", description: "The JSON-stringified arguments object matching the tool's schema." }
         },
         required: ["tool_name", "arguments_json"]
       }
@@ -46,14 +35,11 @@ export default [
     execute: async (args, context) => {
       const mcp = context.mcp;
       if (!mcp) return "Error: MCP Manager is not available.";
-      
       try {
         const parsedArgs = JSON.parse(args.arguments_json);
         const result = await mcp.executeTool(args.tool_name, parsedArgs);
         return result;
-      } catch (err) {
-        return `Error executing MCP tool '${args.tool_name}': ${err.message}`;
-      }
+      } catch (err) { return `Error executing MCP tool '${args.tool_name}': ${err.message}`; }
     }
   }
 ];
