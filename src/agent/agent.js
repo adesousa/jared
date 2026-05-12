@@ -83,7 +83,7 @@ class AgentManager {
 
     const skills = new SkillsManager();
     const skillsDir = path.resolve(process.cwd(), "src", "skills");
-    skills.loadSkillsFromDirectory(skillsDir);
+    await skills.loadSkillsFromDirectory(skillsDir);
 
     const execGuard = new ExecGuard(securityConfig);
     const mcp = new MCPManager(this.config.mcp);

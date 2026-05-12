@@ -184,7 +184,7 @@ async function main() {
     const skillsDir = path.resolve(process.cwd(), "src", "skills");
     const toolsDir = path.resolve(process.cwd(), "src", "tools");
     const startupSkills = new SkillsManager();
-    startupSkills.loadSkillsFromDirectory(skillsDir, true);
+    await startupSkills.loadSkillsFromDirectory(skillsDir, true);
     await startupSkills.loadToolsFromDirectory(toolsDir, {}, true);
     console.log(`\n${P}${B}🤖 Jared: v${pkg.version}${R}`);
     console.log(`  ${G}✓${R} Provider: ${P}${provider}${R} | Model: ${P}${model}${R}`);
