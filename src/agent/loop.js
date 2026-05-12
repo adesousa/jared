@@ -44,11 +44,11 @@ class AgentLoop extends EventEmitter {
       const fullSystemMessage = messages[0];
       const slimSystemMessage = {
         role: "system",
-        content: "Continue the task based on the conversation so far."
+        content: `Continue the task based on the conversation so far.\n\n${skillsContext}\n${mcpContext}`
       };
 
       for (let i = 0; i < this.maxIterations; i++) {
-        // Re-inject the full system prompt on iteration 0 and every N iterations. On all other iterations, use a minimal stub to avoid re-sending the entire soul/tools/skills context on every tool-call round-trip.
+        // Re-inject the full system prompt on iteration 0 and every N iterations. On all other iterations, use a minimal stub to avoid re-sending the entire soul/tools context on every tool-call round-trip.
         const useFullSystem = i === 0 || i % this.systemPromptInterval === 0;
         messages[0] = useFullSystem ? fullSystemMessage : slimSystemMessage;
         if (useFullSystem && i > 0) {
