@@ -235,12 +235,16 @@ async function main() {
     bus.on("cron:trigger", async ({ tasks }) => {
       const prompt = `[System Trigger] The following scheduled tasks are due NOW:\n${tasks.map(t => `- ${t}`).join("\n")}\n\nYour job is to strictly perform the action or immediately remind the user. Do not schedule them again using tools.`;
       try {
+        const crypto = await import("node:crypto");
+        const cronSessionId = `cron-${crypto.randomUUID()}`;
         const result = await agentManager.spinUp(
           prompt,
-          null,
-          "cron",
-          "local_user",
-          "cron"
+          {
+            providerOverride: null,
+            channel: "cron",
+            userId: "local_user",
+            sessionId: cronSessionId
+          }
         );
         if (result.content && result.content.trim() !== "") {
           logger.debug(`[Cron] Agent response: ${result.content.substring(0, 100)}...`);
