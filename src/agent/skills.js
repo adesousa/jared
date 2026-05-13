@@ -10,23 +10,24 @@ class SkillsManager {
     this.tools.push({ type: "function", function: toolSchema });
     this.handlers.set(toolSchema.name, handler);
   }
-  loadSkillsFromDirectory(skillsDir, suppressLog = false) {
+  async loadSkillsFromDirectory(skillsDir, suppressLog = false) {
     if (!fs.existsSync(skillsDir)) return;
-    const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
+    const entries = await fs.promises.readdir(skillsDir, { withFileTypes: true });
+
+    const loadPromises = entries.map(async (entry) => {
+      if (!entry.isDirectory()) return null;
       const skillPath = path.join(skillsDir, entry.name, "SKILL.md");
-      if (!fs.existsSync(skillPath)) continue;
+      if (!fs.existsSync(skillPath)) return null;
       try {
-        const raw = fs.readFileSync(skillPath, "utf8");
+        const raw = await fs.promises.readFile(skillPath, "utf8");
         const parsed = this._parseFrontmatter(raw);
         if (parsed.name && parsed.body) {
-          this.skillInstructions.push({
+          return {
             name: parsed.name,
             description: parsed.description || "",
             instructions: parsed.body,
             path: path.join(skillsDir, entry.name)
-          });
+          };
         }
       } catch (e) {
         if (!suppressLog) {
@@ -35,6 +36,12 @@ class SkillsManager {
           );
         }
       }
+      return null;
+    });
+
+    const results = await Promise.all(loadPromises);
+    for (const res of results) {
+      if (res) this.skillInstructions.push(res);
     }
   }
   _parseFrontmatter(content) {
