@@ -1,6 +1,6 @@
 {
   "name": "jared",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "main": "src/cli/index.js",
   "bin": {
     "jared": "./src/cli/index.js"

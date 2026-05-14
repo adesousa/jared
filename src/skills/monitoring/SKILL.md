@@ -19,17 +19,17 @@ curl -o /dev/null --max-time 5 -s -w "%{http_code}\n" "https://api.example.com/h
 
 1. **Health Check**: Performs a silent curl request (`curl -s`) to the environment URL
 2. **Status Detection**:
-         - ✅ **Healthy**: No stderr output = HTTP 200 (success)
-         - ❌ **Unhealthy**: stderr output or timeout = error state
+   - ✅ **Healthy**: No stderr output = HTTP 200 (success)
+   - ❌ **Unhealthy**: stderr output or timeout = error state
 3. **Analysis**: On failure, sends error details to LLM for diagnosis and solutions
 4. **Reporting**: Displays results in consistent emoji-based format
 
-## Response Format
+## Response Format / Output Format
 
 ### Healthy Environment
 
 ```
-✅ {environment_name} is healthy (curl succeeded)
+✅ {environment_name} : healthy
 Status: 200
 ```
 
@@ -78,9 +78,9 @@ curl -o /dev/null --max-time 5 -s -w "%{http_code}\n" "https://slow-service.exam
 Check each environment sequentially:
 
 ```bash
-curl -o /dev/null --max-time 5 -s -w "%{http_code}\n" "https://api.prod.com/health"
-curl -o /dev/null --max-time 5 -s -w "%{http_code}\n" "https://api.staging.com/health"
-curl -o /dev/null --max-time 5 -s -w "%{http_code}\n" "https://api.dev.com/health"
+ curl -o /dev/null --max-time 5 -s -w "%{http_code}\n" "https://api.prod.com/health"
+ curl -o /dev/null --max-time 5 -s -w "%{http_code}\n" "https://api.staging.com/health"
+ curl -o /dev/null --max-time 5 -s -w "%{http_code}\n" "https://api.dev.com/health"
 ```
 
 ## LLM Analysis
