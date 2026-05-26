@@ -35,7 +35,16 @@ class ConfigManager {
         mistral: { url: "https://api.mistral.ai/v1", keys: [{ name: "mistral-key", value: "", models: ["mistral-medium"] }] },
         openrouter: { url: "https://openrouter.ai/api/v1", keys: [{ name: "openrouter-key", value: "", models: [] }] }
       },
-      agents: { defaults: { provider: "ollama", model: "qwen3:4b-instruct", maxIterations: 15 } },
+      agents: {
+        defaults: {
+          provider: "ollama",
+          model: "qwen3:4b-instruct",
+          maxIterations: 15,
+          compactionThreshold: 20000,
+          compactionKeepCount: 6,
+          selfReview: true
+        }
+      },
       mcp: { servers: {} },
       tools: { web: { search: { apiKey: "" } } },
       channels: {
@@ -51,6 +60,7 @@ class ConfigManager {
       },
       soulPath: path.resolve(process.cwd(), ".jared", this.projectName, "SOUL.md"),
       memoryPath: path.resolve(process.cwd(), ".jared", this.projectName, "memory.db"),
+      skills: { load: "*", fullContent: false },
       debug: false
     };
   }

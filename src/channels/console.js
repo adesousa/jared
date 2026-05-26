@@ -8,6 +8,8 @@ const GREEN = "\x1b[32m";
 const DIM = "\x1b[2m";
 const RESET = "\x1b[0m";
 const BOLD = "\x1b[1m";
+const YELLOW = "\x1b[33m";
+const CYAN = "\x1b[36m";
 const BANNER = `${PURPLE}${BOLD}\n     ██╗ █████╗ ██████╗ ███████╗██████╗ \n     ██║██╔══██╗██╔══██╗██╔════╝██╔══██╗\n     ██║███████║██████╔╝█████╗  ██║  ██║\n██   ██║██╔══██║██╔══██╗██╔══╝  ██║  ██║\n╚█████╔╝██║  ██║██║  ██║███████╗██████╔╝\n ╚════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═════╝ \n${RESET}${DIM}  Your AI COO · Type "exit" to quit${RESET}\n`;
 class StreamMarkdownLexer {
   constructor(writeFn) {
@@ -347,7 +349,19 @@ class ConsoleChannel {
     bus.on("message:stream", payload => {
       if (payload.channel === "console") {
         this.stopSpinner();
-        if (!this.isStreaming) { process.stdout.write(`\n${BOLD}${WHITE}Jared:${RESET} `); this.isStreaming = true; }
+        if (!this.isStreaming) {
+          if (payload.attempt === 1) {
+            this.lexer.fmt.white = WHITE;
+            process.stdout.write(`\n${BOLD}${YELLOW}Jared (Initial Answer):${RESET} `);
+          } else if (payload.attempt > 1) {
+            this.lexer.fmt.white = WHITE;
+            process.stdout.write(`\n${BOLD}${GREEN}Jared (Final Answer):${RESET} `);
+          } else {
+            this.lexer.fmt.white = WHITE;
+            process.stdout.write(`\n${BOLD}${WHITE}Jared:${RESET} `);
+          }
+          this.isStreaming = true;
+        }
         this.lexer.push(payload.token);
       }
     });
@@ -355,10 +369,23 @@ class ConsoleChannel {
       if (payload.channel === "console") {
         logger.debug(`Sending response to console (Tokens: ${payload.usage ? JSON.stringify(payload.usage) : "N/A"}).`);
         this.stopSpinner();
-        if (!this.isStreaming) { process.stdout.write(`\n${BOLD}${WHITE}Jared:${RESET} `); this.lexer.push(payload.content); }
+        if (!this.isStreaming) {
+          if (payload.attempt === 1) {
+            this.lexer.fmt.white = WHITE;
+            process.stdout.write(`\n${BOLD}${YELLOW}Jared (Initial Answer):${RESET} `);
+          } else if (payload.attempt > 1) {
+            this.lexer.fmt.white = WHITE;
+            process.stdout.write(`\n${BOLD}${GREEN}Jared (Final Answer):${RESET} `);
+          } else {
+            this.lexer.fmt.white = WHITE;
+            process.stdout.write(`\n${BOLD}${WHITE}Jared:${RESET} `);
+          }
+          this.lexer.push(payload.content);
+        }
         this.lexer.flush();
         this.lexer.reset();
-        process.stdout.write("\n"); // Final newline to close the stream block
+        this.lexer.fmt.white = WHITE;
+        process.stdout.write(RESET + "\n"); // Final newline to close the stream block
         this.isStreaming = false;
         if (payload.usage) {
           const { promptTokens, completionTokens } = payload.usage;

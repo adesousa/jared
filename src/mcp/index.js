@@ -84,7 +84,7 @@ class MCPManager {
       const template = fs.readFileSync(templatePath, "utf8");
       return template.replace("{{tools}}", sections.join("\n"));
     } catch (err) {
-      return `\n## Available MCP Tools\nYou have the following external MCP tools available. Use the \`get_mcp_tool_schema\` tool to read the exact arguments required for any of these tools before using them with \`execute_mcp_tool\`:\n${sections.join("\n")}\n`;
+      return `\n## Available MCP Tools\nYou have the following external MCP tools available. Use the \`get_mcp_tool_schema\` tool to read the exact arguments required for any of these tools before using them with \`call_mcp_tool\`:\n${sections.join("\n")}\n`;
     }
   }
   getToolSchema(name) {

@@ -274,20 +274,25 @@ Set your default provider and active model:
       "model": "glm-4.6:cloud",
       "thinking": false,
       "maxIterations": 15,
-      "systemPromptInterval": 5
+      "systemPromptInterval": 5,
+      "compactionThreshold": 20000,
+      "compactionKeepCount": 6,
+      "selfReview": true
     }
   }
 }
 ```
 
-| Field                  | Description                                                                            | Default         |
-| ---------------------- | -------------------------------------------------------------------------------------- | --------------- |
-| `provider`             | The default LLM provider to use                                                        | `ollama`        |
-| `thinking`             | Enable reasoning `<think>` blocks                                                      | `true`          |
-| `model`                | The active model for the provider                                                      | `glm-4.6:cloud` |
-| `maxIterations`        | Max tool-use loops per message (prevents infinite loops/runaway $)                     | `15`            |
-| `systemPromptInterval` | How often to re-inject the full system prompt during a multi-step task (see [Token Optimization](#token-optimization)) | `5`  |
-
+| Field                  | Description                                                                                                            | Default         |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------------- |
+| `provider`             | The default LLM provider to use                                                                                        | `ollama`        |
+| `thinking`             | Enable reasoning `<think>` blocks                                                                                      | `true`          |
+| `model`                | The active model for the provider                                                                                      | `glm-4.6:cloud` |
+| `maxIterations`        | Max tool-use loops per message (prevents infinite loops/runaway $)                                                     | `15`            |
+| `systemPromptInterval` | How often to re-inject the full system prompt during a multi-step task (see [Token Optimization](#token-optimization)) | `5`             |
+| `compactionThreshold` | Approximate token count limit (characters / 4) of recent messages to trigger chat history compaction | `20000`         |
+| `compactionKeepCount` | Number of messages to retain as active context in DB after compaction | `6`             |
+| `selfReview`          | Enable independent LLM QA Critic self-review loop before final task completion | `true`          |
 
 ### Explicit Model Routing
 
@@ -381,6 +386,49 @@ Configure workspace sandboxing to restrict all exec commands to a dedicated dire
 
 See [SECURITY.md](./SECURITY.md) for full details.
 
+### Skills Configuration
+
+Control which skills are loaded and how much of their content is injected into the agent's system prompt:
+
+```json
+{
+  "skills": {
+    "load": "*",
+    "fullContent": false
+  }
+}
+```
+
+| Field         | Type                | Default | Description                                                                                                   |
+| ------------- | ------------------- | ------- | ------------------------------------------------------------------------------------------------------------- |
+| `load`        | `"*"` \| `string[]` | `"*"`   | `"*"` loads all skill folders from `src/skills/`. An array cherry-picks specific folder names to load.        |
+| `fullContent` | `boolean`           | `false` | `false` = only front matter (name + description) in prompt. `true` = inject full `SKILL.md` body into prompt. |
+
+**Cherry-pick specific skills:**
+
+```json
+{
+  "skills": {
+    "load": ["weather", "monitoring", "github"]
+  }
+}
+```
+
+> Only the `weather`, `monitoring`, and `github` skill folders will be loaded. All other skills in `src/skills/` are ignored.
+
+**Load full skill content into the prompt:**
+
+```json
+{
+  "skills": {
+    "load": "*",
+    "fullContent": true
+  }
+}
+```
+
+> ⚠️ When `fullContent` is `true`, the entire `SKILL.md` body (instructions, examples, etc.) of each loaded skill is embedded in the system prompt. This increases token usage but removes the need for the agent to call `read_skill_manual` before using a skill. Best used with a small number of cherry-picked skills.
+
 ### Web Search (Brave)
 
 Optionally configure Brave Search for the `web_search` tool:
@@ -423,10 +471,10 @@ For a task with 10 tool calls and `systemPromptInterval: 5`, the full system pro
 }
 ```
 
-| Value | Behavior                                                                            |
-| ----- | ----------------------------------------------------------------------------------- |
-| `1`   | Full system prompt on every iteration (original behavior, maximum safety)           |
-| `5`   | Full prompt on iterations 0, 5, 10, ... (default — good balance)                   |
+| Value | Behavior                                                                                         |
+| ----- | ------------------------------------------------------------------------------------------------ |
+| `1`   | Full system prompt on every iteration (original behavior, maximum safety)                        |
+| `5`   | Full prompt on iterations 0, 5, 10, ... (default — good balance)                                 |
 | `99`  | Full prompt only on iteration 0, never refreshed (maximum savings, best for short focused tasks) |
 
 > When `debug: true` is set, Jared logs `[Loop] Re-injecting full system prompt at iteration N` so you can observe the behavior.

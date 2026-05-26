@@ -6,7 +6,7 @@ description: Summarize public content — articles/text, YouTube videos, or podc
 # Summarize
 
 Summarize public content from three sources: **articles/text**, **YouTube videos**, and **podcasts**.
-Use the tools you already have (`web_fetch`, `exec`, `web_search`) — no external CLI needed.
+Use the tools you already have (`web_fetch`, `run_terminal_command`, `web_search`) — no external CLI needed.
 
 ## When to use (trigger phrases)
 
@@ -65,7 +65,7 @@ If `web_fetch` fails (e.g. paywall, bot protection), tell the user and suggest t
 1. Extract the video ID from the URL.
    - `youtube.com/watch?v=VIDEO_ID` → extract `VIDEO_ID`
    - `youtu.be/VIDEO_ID` → extract `VIDEO_ID`
-2. Fetch the transcript using the public YouTube transcript endpoint via `exec`:
+2. Fetch the transcript using the public YouTube transcript endpoint via `run_terminal_command`:
 
 ```bash
 curl -s "https://www.youtube.com/watch?v=VIDEO_ID" | grep -o '"captionTracks":\[.*?\]' | head -1

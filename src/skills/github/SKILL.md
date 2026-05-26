@@ -5,7 +5,7 @@ description: "Interact with GitHub using the `gh` CLI. Use `gh issue`, `gh pr`, 
 
 # GitHub Skill
 
-Use the `gh` CLI via the `exec` tool to interact with GitHub. Always specify `--repo owner/repo` when not in a git directory, or use URLs directly.
+Use the `gh` CLI via the `run_terminal_command` tool to interact with GitHub. Always specify `--repo owner/repo` when not in a git directory, or use URLs directly.
 
 ## Pull Requests
 

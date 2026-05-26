@@ -28,11 +28,7 @@ test("AgentLoop should respect maxIterations from constructor", async () => {
   const maxIterations = 3;
   const loop = new AgentLoop(context, memory, skills, mcp, provider, maxIterations);
 
-  try {
-    await loop.runTask("test task", "session-1", "user-1");
-    assert.fail("Should have thrown 'Max iterations reached' error");
-  } catch (err) {
-    assert.strictEqual(err.message, "Max iterations reached without completion.");
-    assert.strictEqual(iterations, maxIterations);
-  }
+  const result = await loop.runTask("test task", "session-1", "user-1");
+  assert.ok(result.content.includes("maximum number of iterations allowed"));
+  assert.strictEqual(iterations, maxIterations);
 });

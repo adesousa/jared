@@ -32,8 +32,24 @@ class MemoryManager {
         completion_tokens INTEGER,
         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
       );
+      CREATE TABLE IF NOT EXISTS traces (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id TEXT,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        task_request TEXT,
+        tool_name TEXT,
+        tool_args TEXT,
+        tool_result TEXT,
+        success_score INTEGER,
+        error_message TEXT,
+        active_skill TEXT
+      );
       CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id);
+      CREATE INDEX IF NOT EXISTS idx_traces_tool ON traces(tool_name);
     `);
+    try {
+      this.db.prepare("ALTER TABLE traces ADD COLUMN active_skill TEXT").run();
+    } catch (e) {}
   }
   async addMessage(session_id, role, content) { this.db.prepare("INSERT INTO messages (session_id, role, content) VALUES (?, ?, ?)").run(session_id, role, content); }
   async addTokenUsage(session_id, provider, model, prompt_tokens, completion_tokens) { this.db.prepare("INSERT INTO token_usage (session_id, provider, model, prompt_tokens, completion_tokens) VALUES (?, ?, ?, ?, ?)").run(session_id, provider, model, prompt_tokens, completion_tokens); }
@@ -71,5 +87,29 @@ class MemoryManager {
     return "Memory not found or already removed.";
   }
   async searchPastEvents(query) { const rows = this.db.prepare("SELECT role, content, timestamp FROM messages WHERE content LIKE ? ORDER BY timestamp DESC LIMIT 20").all(`%${query}%`); return rows.map(r => `[${r.timestamp}] ${r.role}: ${r.content}`).join("\\n"); }
+  
+  async addTrace(session_id, task_request, tool_name, tool_args, tool_result, success_score, error_message = null, active_skill = null) {
+    let resultStr = typeof tool_result === "string" ? tool_result : JSON.stringify(tool_result);
+    if (resultStr && resultStr.length > 2000) {
+      resultStr = resultStr.substring(0, 2000) + "... [Truncated]";
+    }
+    const argsStr = typeof tool_args === "string" ? tool_args : JSON.stringify(tool_args);
+    this.db.prepare("INSERT INTO traces (session_id, task_request, tool_name, tool_args, tool_result, success_score, error_message, active_skill) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(session_id, task_request, tool_name, argsStr, resultStr, success_score, error_message, active_skill);
+  }
+  async getRecentFailures(tool_name, limit = 2) {
+    return this.db.prepare("SELECT error_message, timestamp FROM traces WHERE tool_name = ? AND success_score = 0 ORDER BY timestamp DESC LIMIT ?").all(tool_name, limit);
+  }
+  async getFullSessionMessages(session_id) {
+    return this.db.prepare("SELECT id, role, content FROM messages WHERE session_id = ? ORDER BY timestamp ASC, id ASC").all(session_id);
+  }
+  async truncateSessionMessages(session_id, idsToKeep) {
+    if (idsToKeep.length === 0) {
+      this.db.prepare("DELETE FROM messages WHERE session_id = ?").run(session_id);
+      return;
+    }
+    const placeholders = idsToKeep.map(() => "?").join(",");
+    this.db.prepare(`DELETE FROM messages WHERE session_id = ? AND id NOT IN (${placeholders})`).run(session_id, ...idsToKeep);
+  }
 }
 export default MemoryManager;

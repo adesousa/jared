@@ -10,12 +10,16 @@ class SkillsManager {
     this.tools.push({ type: "function", function: toolSchema });
     this.handlers.set(toolSchema.name, handler);
   }
-  async loadSkillsFromDirectory(skillsDir, suppressLog = false) {
+  hasTool(name) {
+    return this.handlers.has(name);
+  }
+  async loadSkillsFromDirectory(skillsDir, { suppressLog = false, filter = "*" } = {}) {
     if (!fs.existsSync(skillsDir)) return;
     const entries = await fs.promises.readdir(skillsDir, { withFileTypes: true });
 
     const loadPromises = entries.map(async (entry) => {
       if (!entry.isDirectory()) return null;
+      if (Array.isArray(filter) && !filter.includes(entry.name)) return null;
       const skillPath = path.join(skillsDir, entry.name, "SKILL.md");
       if (!fs.existsSync(skillPath)) return null;
       try {
@@ -60,13 +64,25 @@ class SkillsManager {
     }
     return { name: fields.name || null, description: fields.description || null, body };
   }
-  getSkillsContext() {
+  getSkillsContext(fullContent = false) {
     if (this.skillInstructions.length === 0) return "";
+    const templatePath = path.join(process.cwd(), "src", "identity", "SKILLS.md");
+
+    if (fullContent) {
+      const sections = this.skillInstructions.map(skill => {
+        return `### ${skill.name}\n${skill.instructions}`;
+      });
+      try {
+        const template = fs.readFileSync(templatePath, "utf8");
+        return template.replace("{{skills}}", sections.join("\n\n"));
+      } catch (err) {
+        return `\n## Available Skills\n${sections.join("\n\n")}\n`;
+      }
+    }
+
     const sections = this.skillInstructions.map(skill => {
       return `- **${skill.name}**: ${skill.description ? skill.description : "No description available."}`;
     });
-
-    const templatePath = path.join(process.cwd(), "src", "identity", "SKILLS.md");
     try {
       const template = fs.readFileSync(templatePath, "utf8");
       return template.replace("{{skills}}", sections.join("\n"));
@@ -94,6 +110,12 @@ class SkillsManager {
     }
   }
   getTools() { return this.tools; }
+  getLoadedSkills() {
+    return this.skillInstructions.map(s => {
+      const folderName = path.basename(s.path);
+      return { folderName, name: s.name };
+    });
+  }
   async executeTool(name, argsJson) {
     try {
       const handler = this.handlers.get(name);

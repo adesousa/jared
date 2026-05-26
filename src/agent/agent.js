@@ -83,9 +83,10 @@ class AgentManager {
 
     const skills = new SkillsManager();
     const skillsDir = path.resolve(process.cwd(), "src", "skills");
-    await skills.loadSkillsFromDirectory(skillsDir);
+    const skillsConfig = this.config.skills || {};
+    await skills.loadSkillsFromDirectory(skillsDir, { filter: skillsConfig.load || "*" });
 
-    const execGuard = new ExecGuard(securityConfig);
+    const execGuard = new ExecGuard({ ...securityConfig, channel, userId, sessionId });
     const mcp = new MCPManager(this.config.mcp);
     await mcp.initialize();
 
@@ -114,7 +115,7 @@ class AgentManager {
       modelOverride
     );
 
-    let skillsContext = skills.getSkillsContext();
+    let skillsContext = skills.getSkillsContext(skillsConfig.fullContent === true);
     let mcpContext = mcp.getMCPContext();
 
     let maxIterations = this.config.agents?.defaults?.maxIterations || 15;
@@ -132,12 +133,13 @@ class AgentManager {
       mcp,
       provider,
       maxIterations,
-      systemPromptInterval
+      systemPromptInterval,
+      this.config
     );
     const onToken =
-      channel === "console" && !isSubagent
-        ? token => {
-            bus.emit("message:stream", { channel, userId, sessionId, token });
+      (channel === "console" || channel === "whatsapp") && !isSubagent
+        ? (token, attempt = 1) => {
+            bus.emit("message:stream", { channel, userId, sessionId, token, attempt });
           }
         : null;
 
@@ -145,7 +147,7 @@ class AgentManager {
       actualTaskDescription,
       sessionId,
       userId,
-      skills.getSkillsContext(),
+      skills.getSkillsContext(skillsConfig.fullContent === true),
       mcp.getMCPContext(),
       onToken
     );
@@ -170,7 +172,54 @@ class AgentManager {
         result.usage.completionTokens
       );
 
-    return { content: responseContent, usage: result.usage };
+    return { content: responseContent, usage: result.usage, attempt: result.attempt };
+  }
+
+  async manualCompact(sessionId = "session-1", userId = "local_user") {
+    const dbPath =
+      this.config.memoryPath ||
+      path.join(
+        process.cwd(),
+        ".jared",
+        this.config.projectName || "",
+        "memory.db"
+      );
+    const memory = new MemoryManager(dbPath);
+    await memory.initialize();
+    const provider = new ProviderRouter(this.config);
+    const agentLoop = new AgentLoop(
+      null,
+      memory,
+      null,
+      null,
+      provider,
+      15,
+      5,
+      this.config
+    );
+    const compactionKeepCount = this.config.agents?.defaults?.compactionKeepCount ?? 6;
+    await agentLoop.compactHistory(sessionId, userId, compactionKeepCount);
+    return "Compaction completed successfully.";
+  }
+
+  async manualAutoImprove(toolName = null) {
+    const dbPath =
+      this.config.memoryPath ||
+      path.join(
+        process.cwd(),
+        ".jared",
+        this.config.projectName || "",
+        "memory.db"
+      );
+    const memory = new MemoryManager(dbPath);
+    await memory.initialize();
+    const autoImproveTool = (await import("../tools/auto-improvement.js")).default;
+    const runtimeContext = {
+      config: this.config,
+      memory
+    };
+    const report = await autoImproveTool.execute({ toolName }, runtimeContext);
+    return report;
   }
 }
 export default AgentManager;

@@ -1,8 +1,8 @@
 export default {
   schema: {
-    name: "exec",
+    name: "run_terminal_command",
     description:
-      "Execute a shell command and return stdout. IMPORTANT: If restricted to a workspace sandbox, your current directory is the root of your workspace. Do not attempt to use absolute paths outside of it or traverse up. You can still attempt urls starting by http or https",
+      "Execute a terminal / bash shell command (e.g. 'curl', 'git', 'mkdir', 'ls', 'grep') and return stdout. IMPORTANT: If restricted to a workspace sandbox, your current directory is the root of your workspace. Do not attempt to use absolute paths outside of it or traverse up. You can still attempt urls starting by http or https",
     parameters: {
       type: "object",
       properties: {
@@ -12,13 +12,13 @@ export default {
         },
         timeout: {
           type: "integer",
-          description: "Timeout in ms (default: 30000)"
+          description: "Timeout in ms (default: 120000)"
         }
       },
       required: ["command"]
     }
   },
-  execute: async ({ command, timeout = 30000 }, context) => {
+  execute: async ({ command, timeout = 120000 }, context) => {
     const { execGuard } = context;
     const check = await execGuard.validate(command);
     if (!check.allowed) return { error: check.reason };

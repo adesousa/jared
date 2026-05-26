@@ -20,10 +20,10 @@ async function main() {
     options,
     allowPositionals: true
   });
-  if (values.help || positionals.length === 0) { console.log("\nUsage: jared <command> [project-name]\n\nCommands:\n  onboard <project>       Initialize Jared config for a project\n  start <project>         Start Jared in interactive/channel listening mode\n  audit                   Check dependencies for known vulnerabilities\n  lines                   Count lines of code in the core agent\n  reset-memory <project>  Reset the project's memory database\n  stats <project>         Show core token usage stats for a project\n"); process.exit(0); }
+  if (values.help || positionals.length === 0) { console.log("\nUsage: jared <command> [project-name]\n\nCommands:\n  onboard <project>       Initialize Jared config for a project\n  start <project>         Start Jared in interactive/channel listening mode\n  audit                   Check dependencies for known vulnerabilities\n  lines                   Count lines of code in the core agent\n  reset-memory <project>  Reset the project's memory database\n  stats <project>         Show core token usage stats for a project\n  auto-improve <project>  Manually trigger skill auto-improvement\n"); process.exit(0); }
   const command = positionals[0];
   const projectName = positionals[1];
-  const projectCommands = ["onboard", "start", "reset-memory", "stats"];
+  const projectCommands = ["onboard", "start", "reset-memory", "stats", "auto-improve"];
   if (projectCommands.includes(command) && !projectName) {
     const fsSync = await import("node:fs");
     const jaredDir = path.join(process.cwd(), ".jared");
@@ -99,7 +99,7 @@ async function main() {
     console.log(`${D}   Soul saved to: .jared/${projectName}/SOUL.md (edit anytime)${R}`);
     const hbPath = path.join(soulDir, "BACKLOG.md");
     try { await fs.access(hbPath); } catch {
-      const hbTemplate = `# Project Backlog\n\n## One Shot Tasks\n\n## Daily Tasks\n### ⏰ 06:45 — Morning Briefing\n- Check Google Calendar: list all events for today with times\n\n## Weekly Tasks\n### ⏰ Friday 17:00 — Weekly Report\n- Pull this week's key metrics vs. last week\n\n## Monthly Tasks\n### ⏰ 25th 10:00 — Lead Alert\n- Check Accountability CRM\n\n## Product Backlog\n`;
+      const hbTemplate = `# Project Backlog\n\n## One Shot Tasks\n\n## Daily Tasks\n### ⏰ 06:45 — Morning Briefing\n- Check Google Calendar: list all events for today with times\n\n## Weekly Tasks\n### ⏰ Friday 17:00 — Weekly Report\n- Pull this week's key metrics vs. last week\n\n### ⏰ Friday 18:00 — Auto-Improvement\n- Run the \`/auto-improve\` command to analyze recent execution traces and optimize skill instructions under \`src/skills\`.\n\n## Monthly Tasks\n### ⏰ 25th 10:00 — Lead Alert\n- Check Accountability CRM\n\n## Product Backlog\n`;
       await fs.writeFile(hbPath, hbTemplate, "utf8");
       console.log(`${G}✓${R} Created .jared/${projectName}/BACKLOG.md`);
     }
@@ -121,12 +121,17 @@ async function main() {
     rl.close();
     process.exit(0);
   }
-  if (["audit", "lines", "reset-memory", "stats"].includes(command)) {
+  if (["audit", "lines", "reset-memory", "stats", "auto-improve"].includes(command)) {
     try {
       const { execSync } = await import("node:child_process");
       const cwd = process.cwd();
       if (command === "audit") { console.log("\n🔍 Running dependency security audit...\n"); try { execSync("npm audit --audit-level=moderate", { encoding: "utf8", cwd, stdio: "inherit" }); } catch (err) { if (err.status && err.status > 0) { console.log("\n⚠️  Vulnerabilities found. Run 'npm audit fix' to resolve."); } }
       } else if (command === "lines") { execSync("bash scripts/core_agent_lines.sh", { cwd, stdio: "inherit" });
+      } else if (command === "auto-improve") {
+        console.log(`\n🧬 Running manual auto-improvement for project '${projectName}'...\n`);
+        const manager = new AgentManager(config);
+        const res = await manager.manualAutoImprove();
+        console.log(`\nReport:\n${res}\n`);
       } else if (command === "reset-memory") {
         const fs = await import("node:fs/promises");
         const dbPath = path.join(cwd, ".jared", projectName, "memory.db");
@@ -184,7 +189,8 @@ async function main() {
     const skillsDir = path.resolve(process.cwd(), "src", "skills");
     const toolsDir = path.resolve(process.cwd(), "src", "tools");
     const startupSkills = new SkillsManager();
-    await startupSkills.loadSkillsFromDirectory(skillsDir, true);
+    const skillsConfig = config.skills || {};
+    await startupSkills.loadSkillsFromDirectory(skillsDir, { suppressLog: true, filter: skillsConfig.load || "*" });
     await startupSkills.loadToolsFromDirectory(toolsDir, {}, true);
     console.log(`\n${P}${B}🤖 Jared: v${pkg.version}${R}`);
     console.log(`  ${G}✓${R} Provider: ${P}${provider}${R} | Model: ${P}${model}${R}`);
@@ -198,7 +204,46 @@ async function main() {
     const agentManager = new AgentManager(config);
     bus.on("message:received", async payload => {
       try {
-        let content = payload.content;
+        let content = payload.content.trim();
+        if (content.startsWith("/compact")) {
+          bus.emit("message:send", {
+            channel: payload.channel,
+            userId: payload.userId,
+            sessionId: payload.sessionId,
+            content: "🧠 Starting manual context history compaction...",
+            meta: payload.meta
+          });
+          const res = await agentManager.manualCompact(payload.sessionId, payload.userId);
+          bus.emit("message:send", {
+            channel: payload.channel,
+            userId: payload.userId,
+            sessionId: payload.sessionId,
+            content: `✓ ${res}`,
+            meta: payload.meta
+          });
+          return;
+        }
+        if (content.startsWith("/auto-improve")) {
+          const matchTool = content.match(/\/auto-improve\s+(\S+)/);
+          const targetTool = matchTool ? matchTool[1] : null;
+          bus.emit("message:send", {
+            channel: payload.channel,
+            userId: payload.userId,
+            sessionId: payload.sessionId,
+            content: `🧬 Running auto-improvement${targetTool ? ` for tool '${targetTool}'` : ""}...`,
+            meta: payload.meta
+          });
+          const report = await agentManager.manualAutoImprove(targetTool);
+          bus.emit("message:send", {
+            channel: payload.channel,
+            userId: payload.userId,
+            sessionId: payload.sessionId,
+            content: `✓ Auto-improvement completed.\n\n${report}`,
+            meta: payload.meta
+          });
+          return;
+        }
+
         let providerOverride = null;
         const providersKeys = Object.keys(config.providers || {});
         const match = content.match(/--([a-zA-Z0-9_-]+)(?:\s|$)/);
@@ -218,6 +263,7 @@ async function main() {
           sessionId: payload.sessionId,
           content: result.content,
           usage: result.usage,
+          attempt: result.attempt,
           meta: payload.meta
         });
       } catch (e) {

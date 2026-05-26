@@ -21,6 +21,9 @@ class ExecGuard {
     this.blockedPatterns = BLOCKED_PATTERNS;
     this.restrictToWorkspace = securityConfig.restrictToWorkspace || false;
     this.workspaceDir = securityConfig.workspaceDir || null;
+    this.channel = securityConfig.channel || "default";
+    this.userId = securityConfig.userId || "local_user";
+    this.sessionId = securityConfig.sessionId || "session-1";
   }
   async validate(command) {
     for (const pattern of this.blockedPatterns) {
@@ -83,7 +86,10 @@ class ExecGuard {
       const payload = {
         promptText: `\n🔒 [EXEC GUARD] Jared wants to run:\n   $ ${command}\n   Allow? (y/n): `,
         handled: false,
-        callback: answer => { const a = answer.trim().toLowerCase(); resolve(a === "y" || a === "yes"); }
+        callback: answer => { const a = answer.trim().toLowerCase(); resolve(a === "y" || a === "yes"); },
+        channel: this.channel,
+        userId: this.userId,
+        sessionId: this.sessionId
       };
       bus.emit("console:question", payload);
       if (!payload.handled) {
