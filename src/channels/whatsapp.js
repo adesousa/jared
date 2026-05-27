@@ -5,9 +5,89 @@ import sessionManager from "../session/index.js";
 import { logger } from "../utils/index.js";
 
 // Helper functions for WhatsApp-specific Markdown and Table formatting
+function stripLinks(cell) {
+  let result = "";
+  let i = 0;
+  while (i < cell.length) {
+    if (cell[i] === '[') {
+      let closeBrackIndex = cell.indexOf(']', i);
+      if (closeBrackIndex !== -1 && cell[closeBrackIndex + 1] === '(') {
+        let closeParenIndex = -1;
+        let parenCount = 1;
+        for (let p = closeBrackIndex + 2; p < cell.length; p++) {
+           if (cell[p] === '(') parenCount++;
+           else if (cell[p] === ')') {
+              parenCount--;
+              if (parenCount === 0) {
+                 closeParenIndex = p;
+                 break;
+              }
+           }
+        }
+        if (closeParenIndex !== -1) {
+           const linkText = cell.slice(i + 1, closeBrackIndex);
+           result += linkText;
+           i = closeParenIndex + 1;
+           continue;
+        }
+      }
+    }
+    result += cell[i];
+    i++;
+  }
+  return result;
+}
+
+function formatWhatsAppLink(text, url) {
+  const cleanText = text.trim().toLowerCase().replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
+  const cleanUrl = url.trim().toLowerCase().replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
+  
+  if (cleanText === cleanUrl || cleanText === "" || url.includes(text)) {
+    return url;
+  }
+  return `${text} (${url})`;
+}
+
+function formatWhatsAppLinksInText(text) {
+  let result = "";
+  let i = 0;
+  while (i < text.length) {
+    if (text[i] === '[') {
+      let closeBrackIndex = text.indexOf(']', i);
+      if (closeBrackIndex !== -1 && text[closeBrackIndex + 1] === '(') {
+        let closeParenIndex = -1;
+        let parenCount = 1;
+        for (let p = closeBrackIndex + 2; p < text.length; p++) {
+           if (cell => false) {} // dummy check, not needed
+           if (text[p] === '(') parenCount++;
+           else if (text[p] === ')') {
+              parenCount--;
+              if (parenCount === 0) {
+                 closeParenIndex = p;
+                 break;
+              }
+           }
+        }
+        if (closeParenIndex !== -1) {
+           const linkText = text.slice(i + 1, closeBrackIndex);
+           const linkUrl = text.slice(closeBrackIndex + 2, closeParenIndex);
+           result += formatWhatsAppLink(linkText, linkUrl);
+           i = closeParenIndex + 1;
+           continue;
+        }
+      }
+    }
+    result += text[i];
+    i++;
+  }
+  return result;
+}
+
 function formatTableToMonospace(lines) {
   const rows = [];
   let maxCols = 0;
+  const linksCollected = [];
+
   for (const line of lines) {
     let trimmed = line.trim();
     if (trimmed.startsWith("|")) trimmed = trimmed.substring(1);
@@ -15,6 +95,42 @@ function formatTableToMonospace(lines) {
     const cells = trimmed.split("|").map(c => c.trim());
     maxCols = Math.max(maxCols, cells.length);
     rows.push({ cells });
+  }
+
+  // Collect links
+  for (const row of rows) {
+    for (const cell of row.cells) {
+      let i = 0;
+      while (i < cell.length) {
+        if (cell[i] === '[') {
+          let closeBrackIndex = cell.indexOf(']', i);
+          if (closeBrackIndex !== -1 && cell[closeBrackIndex + 1] === '(') {
+            let closeParenIndex = -1;
+            let parenCount = 1;
+            for (let p = closeBrackIndex + 2; p < cell.length; p++) {
+               if (cell[p] === '(') parenCount++;
+               else if (cell[p] === ')') {
+                  parenCount--;
+                  if (parenCount === 0) {
+                     closeParenIndex = p;
+                     break;
+                  }
+               }
+            }
+            if (closeParenIndex !== -1) {
+               const linkText = cell.slice(i + 1, closeBrackIndex);
+               const linkUrl = cell.slice(closeBrackIndex + 2, closeParenIndex);
+               if (!linksCollected.some(l => l.url === linkUrl)) {
+                 linksCollected.push({ text: linkText, url: linkUrl });
+               }
+               i = closeParenIndex + 1;
+               continue;
+            }
+          }
+        }
+        i++;
+      }
+    }
   }
 
   let hasSeparator = false;
@@ -27,8 +143,8 @@ function formatTableToMonospace(lines) {
     if (hasSeparator && i === 1) continue;
     for (let j = 0; j < rows[i].cells.length; j++) {
       let cell = rows[i].cells[j] || "";
-      let visibleLen = cell.replace(/\*\*|\*|`/g, "").length;
-      colWidths[j] = Math.max(colWidths[j] || 0, visibleLen);
+      let cleanCell = stripLinks(cell).replace(/\*\*|\*|`/g, "");
+      colWidths[j] = Math.max(colWidths[j] || 0, cleanCell.length);
     }
   }
 
@@ -50,7 +166,7 @@ function formatTableToMonospace(lines) {
     let rowParts = [prefix];
     for (let j = 0; j < colWidths.length; j++) {
       let cell = rows[i].cells[j] || "";
-      let cleanCell = cell.replace(/\*\*|\*|`/g, "");
+      let cleanCell = stripLinks(cell).replace(/\*\*|\*|`/g, "");
       let visibleLen = cleanCell.length;
       let padLen = Math.max(0, colWidths[j] - visibleLen);
 
@@ -69,7 +185,13 @@ function formatTableToMonospace(lines) {
   let bottom = "└" + colWidths.map(w => "─".repeat(w + 2)).join("┴") + "┘";
   resultParts.push(bottom);
 
-  return "```\n" + resultParts.join("") + "\n```";
+  let output = "```\n" + resultParts.join("") + "\n```";
+  
+  if (linksCollected.length > 0) {
+    output += "\n\n**Links & Sources:**\n" + linksCollected.map(l => `• **${l.text}**: ${l.url}`).join("\n");
+  }
+
+  return output;
 }
 
 function formatWhatsAppMarkdown(text) {
@@ -120,6 +242,9 @@ function formatWhatsAppMarkdown(text) {
 
   let result = formattedLines.join("\n");
 
+  // Format links
+  result = formatWhatsAppLinksInText(result);
+
   // Italic: *text* (not next to another *) -> _text_
   result = result.replace(/(?<!\*)\*(?!\*)(.*?)(?<!\*)\*(?!\*)/g, "_$1_");
 
@@ -131,6 +256,7 @@ function formatWhatsAppMarkdown(text) {
 
   return result;
 }
+
 
 class SessionState {
   constructor() {

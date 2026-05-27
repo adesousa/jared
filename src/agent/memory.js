@@ -93,9 +93,13 @@ class MemoryManager {
     if (resultStr && resultStr.length > 2000) {
       resultStr = resultStr.substring(0, 2000) + "... [Truncated]";
     }
+    let errorStr = typeof error_message === "string" ? error_message : (error_message ? JSON.stringify(error_message) : null);
+    if (errorStr && errorStr.length > 2000) {
+      errorStr = errorStr.substring(0, 2000) + "... [Truncated]";
+    }
     const argsStr = typeof tool_args === "string" ? tool_args : JSON.stringify(tool_args);
     this.db.prepare("INSERT INTO traces (session_id, task_request, tool_name, tool_args, tool_result, success_score, error_message, active_skill) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-      .run(session_id, task_request, tool_name, argsStr, resultStr, success_score, error_message, active_skill);
+      .run(session_id, task_request, tool_name, argsStr, resultStr, success_score, errorStr, active_skill);
   }
   async getRecentFailures(tool_name, limit = 2) {
     return this.db.prepare("SELECT error_message, timestamp FROM traces WHERE tool_name = ? AND success_score = 0 ORDER BY timestamp DESC LIMIT ?").all(tool_name, limit);

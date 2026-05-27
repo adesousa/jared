@@ -42,7 +42,9 @@ class ConfigManager {
           maxIterations: 15,
           compactionThreshold: 20000,
           compactionKeepCount: 6,
-          selfReview: true
+          selfReview: true,
+          systemPromptInterval: 5,
+          thinking: true
         }
       },
       mcp: { servers: {} },

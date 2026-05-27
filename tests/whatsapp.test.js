@@ -46,3 +46,30 @@ test("WhatsApp Formatting: table translation", () => {
   const result = formatWhatsAppMarkdown(input);
   assert.ok(result.includes(expectedTable), `Expected result to include formatted table, got:\n${result}`);
 });
+
+test("WhatsApp Formatting: inline links formatting", () => {
+  const input = "Please visit [vatican.va](https://vatican.va) and check out [Wikipedia: Dog](https://wikipedia.org/wiki/Dog_(disambiguation)).";
+  // vatican.va is redundant with https://vatican.va, so it simplifies to the URL.
+  // Wikipedia: Dog is a description, so it formats as Description (URL).
+  const expected = "Please visit https://vatican.va and check out Wikipedia: Dog (https://wikipedia.org/wiki/Dog_(disambiguation)).";
+  assert.strictEqual(formatWhatsAppMarkdown(input), expected);
+});
+
+test("WhatsApp Formatting: table with links extraction", () => {
+  const input = `| Name | Link |
+| --- | --- |
+| Vatican | [vatican.va](https://vatican.va) |`;
+
+  const expectedTablePart = "┌─────────┬────────────┐\n" +
+    "│ Name    │ Link       │\n" +
+    "├─────────┼────────────┤\n" +
+    "│ Vatican │ vatican.va │\n" +
+    "└─────────┴────────────┘";
+
+  const expectedSourcePart = "*Links & Sources:*\n• *vatican.va*: https://vatican.va";
+
+  const result = formatWhatsAppMarkdown(input);
+  assert.ok(result.includes(expectedTablePart), `Expected table part to be formatted, got:\n${result}`);
+  assert.ok(result.includes(expectedSourcePart), `Expected sources part to be listed, got:\n${result}`);
+});
+

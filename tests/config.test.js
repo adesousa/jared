@@ -27,10 +27,14 @@ test("ConfigManager load() initializes with defaults when file is missing", asyn
 
   assert.strictEqual(config.projectName, PROJECT_NAME);
   assert.strictEqual(config.channels.console.enabled, true);
+  assert.strictEqual(config.agents.defaults.systemPromptInterval, 5);
+  assert.strictEqual(config.agents.defaults.thinking, true);
 
   // Verify file was saved
   const fileContent = JSON.parse(await fs.readFile(CONFIG_FILE, "utf8"));
   assert.strictEqual(fileContent.channels.console.enabled, true);
+  assert.strictEqual(fileContent.agents.defaults.systemPromptInterval, 5);
+  assert.strictEqual(fileContent.agents.defaults.thinking, true);
 
   await cleanup();
 });

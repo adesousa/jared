@@ -11,6 +11,73 @@ const BOLD = "\x1b[1m";
 const YELLOW = "\x1b[33m";
 const CYAN = "\x1b[36m";
 const BANNER = `${PURPLE}${BOLD}\n     ██╗ █████╗ ██████╗ ███████╗██████╗ \n     ██║██╔══██╗██╔══██╗██╔════╝██╔══██╗\n     ██║███████║██████╔╝█████╗  ██║  ██║\n██   ██║██╔══██║██╔══██╗██╔══╝  ██║  ██║\n╚█████╔╝██║  ██║██║  ██║███████╗██████╔╝\n ╚════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═════╝ \n${RESET}${DIM}  Your AI COO · Type "exit" to quit${RESET}\n`;
+function stripLinks(cell) {
+  let result = "";
+  let i = 0;
+  while (i < cell.length) {
+    if (cell[i] === '[') {
+      let closeBrackIndex = cell.indexOf(']', i);
+      if (closeBrackIndex !== -1 && cell[closeBrackIndex + 1] === '(') {
+        let closeParenIndex = -1;
+        let parenCount = 1;
+        for (let p = closeBrackIndex + 2; p < cell.length; p++) {
+           if (cell[p] === '(') parenCount++;
+           else if (cell[p] === ')') {
+              parenCount--;
+              if (parenCount === 0) {
+                 closeParenIndex = p;
+                 break;
+              }
+           }
+        }
+        if (closeParenIndex !== -1) {
+           const linkText = cell.slice(i + 1, closeBrackIndex);
+           result += linkText;
+           i = closeParenIndex + 1;
+           continue;
+        }
+      }
+    }
+    result += cell[i];
+    i++;
+  }
+  return result;
+}
+
+function formatCellLinks(cell, formatLinkFn) {
+  let result = "";
+  let i = 0;
+  while (i < cell.length) {
+    if (cell[i] === '[') {
+      let closeBrackIndex = cell.indexOf(']', i);
+      if (closeBrackIndex !== -1 && cell[closeBrackIndex + 1] === '(') {
+        let closeParenIndex = -1;
+        let parenCount = 1;
+        for (let p = closeBrackIndex + 2; p < cell.length; p++) {
+           if (cell[p] === '(') parenCount++;
+           else if (cell[p] === ')') {
+              parenCount--;
+              if (parenCount === 0) {
+                 closeParenIndex = p;
+                 break;
+              }
+           }
+        }
+        if (closeParenIndex !== -1) {
+           const linkText = cell.slice(i + 1, closeBrackIndex);
+           const linkUrl = cell.slice(closeBrackIndex + 2, closeParenIndex);
+           result += formatLinkFn(linkText, linkUrl);
+           i = closeParenIndex + 1;
+           continue;
+        }
+      }
+    }
+    result += cell[i];
+    i++;
+  }
+  return result;
+}
+
 class StreamMarkdownLexer {
   constructor(writeFn) {
     this.write = writeFn;
@@ -29,9 +96,11 @@ class StreamMarkdownLexer {
       blue: "\x1b[34m",
       green: GREEN,
       dim: DIM,
-      white: WHITE
+      white: WHITE,
+      underline: "\x1b[4m"
     };
     this.atLineStart = true;
+    this.isFlushing = false;
   }
   reset() {
      this.buffer = '';
@@ -49,6 +118,15 @@ class StreamMarkdownLexer {
      if (this.isItalic) fmt += this.fmt.italic;
      if (this.isCode) fmt += this.fmt.cyan;
      return fmt;
+  }
+  formatLink(text, url) {
+    const linkStyle = this.fmt.underline + this.fmt.cyan;
+    const resetStyle = "\x1b[24m" + this.getStateFmt();
+    const formattedText = text
+      .replace(/\*\*(.*?)\*\*/g, this.fmt.bold + "$1" + linkStyle)
+      .replace(/\*(.*?)\*/g, this.fmt.italic + "$1" + linkStyle)
+      .replace(/`(.*?)`/g, this.fmt.cyan + "$1" + linkStyle);
+    return `\u001b]8;;${url}\u001b\\${linkStyle}${formattedText}${resetStyle}\u001b]8;;\u001b\\`;
   }
   push(chunk) { this.buffer += chunk; this.process(); }
   process() {
@@ -141,6 +219,52 @@ class StreamMarkdownLexer {
          } else if (i + 1 === this.buffer.length) { break; }
       }
       if (char === '[') {
+         let closeBrackIndex = -1;
+         let closeParenIndex = -1;
+         for (let p = i + 1; p < this.buffer.length; p++) {
+            if (this.buffer[p] === ']') {
+               closeBrackIndex = p;
+               break;
+            }
+         }
+         if (closeBrackIndex !== -1) {
+            if (closeBrackIndex + 1 < this.buffer.length) {
+               if (this.buffer[closeBrackIndex + 1] === '(') {
+                  let parenCount = 1;
+                  for (let p = closeBrackIndex + 2; p < this.buffer.length; p++) {
+                     if (this.buffer[p] === '(') {
+                        parenCount++;
+                     } else if (this.buffer[p] === ')') {
+                        parenCount--;
+                        if (parenCount === 0) {
+                           closeParenIndex = p;
+                           break;
+                        }
+                     }
+                  }
+                  if (closeParenIndex !== -1) {
+                     const linkText = this.buffer.slice(i + 1, closeBrackIndex);
+                     const linkUrl = this.buffer.slice(closeBrackIndex + 2, closeParenIndex);
+                     out += this.formatLink(linkText, linkUrl);
+                     i = closeParenIndex + 1;
+                     this.atLineStart = false;
+                     continue;
+                  } else {
+                     if (!this.isFlushing && this.buffer.length - i < 1000) {
+                        break;
+                     }
+                  }
+               }
+            } else {
+               if (!this.isFlushing && this.buffer.length - i < 1000) {
+                  break;
+               }
+            }
+         } else {
+            if (!this.isFlushing && this.buffer.length - i < 1000) {
+               break;
+            }
+         }
          out += this.fmt.cyan + char;
          i++;
          this.atLineStart = false;
@@ -172,6 +296,9 @@ class StreamMarkdownLexer {
     if (out) this.write(out);
   }
   flush() {
+    this.isFlushing = true;
+    this.process();
+    this.isFlushing = false;
     if (this.buffer) {
        let trimmed = this.buffer.trimStart();
        if (this.inTable || (this.atLineStart && trimmed.startsWith('|'))) {
@@ -212,8 +339,8 @@ class StreamMarkdownLexer {
         if (hasSeparator && i === 1) continue;
         for (let j = 0; j < rows[i].cells.length; j++) {
            let cell = rows[i].cells[j];
-           let visibleLen = cell.replace(/\*\*|\*|`/g, '').length;
-           colWidths[j] = Math.max(colWidths[j] || 0, visibleLen);
+           let cleanCell = stripLinks(cell).replace(/\*\*|\*|`/g, '');
+           colWidths[j] = Math.max(colWidths[j] || 0, cleanCell.length);
         }
      }
 
@@ -241,12 +368,17 @@ class StreamMarkdownLexer {
         let rowParts = [prefix];
         for (let j = 0; j < colWidths.length; j++) {
            let cell = rows[i].cells[j] || "";
-           let visibleLen = cell.replace(/\*\*|\*|`/g, '').length;
+           let cleanCell = stripLinks(cell).replace(/\*\*|\*|`/g, '');
+           let visibleLen = cleanCell.length;
            let padLen = Math.max(0, colWidths[j] - visibleLen);
            let formattedCell = cell
               .replace(/\*\*(.*?)\*\*/g, bold + "$1" + stateFmt)
               .replace(/\*(.*?)\*/g, italic + "$1" + stateFmt)
               .replace(/`(.*?)`/g, cyan + "$1" + stateFmt);
+           
+           formattedCell = formatCellLinks(formattedCell, (text, url) => {
+              return this.formatLink(text, url);
+           });
               
            rowParts.push(formattedCell);
            if (padLen > 0) rowParts.push(" ".repeat(padLen));
