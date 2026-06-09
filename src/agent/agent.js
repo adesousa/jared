@@ -32,7 +32,8 @@ class AgentManager {
       userId = "local_user",
       sessionId = "session-1",
       isSubagent = false,
-      role = null
+      role = null,
+      noContext = false
     } = opts;
     const dbPath =
       this.config.memoryPath ||
@@ -78,7 +79,8 @@ class AgentManager {
       memory,
       customSoulPath,
       isTeamRole,
-      securityConfig
+      securityConfig,
+      isSubagent
     );
 
     const skills = new SkillsManager();
@@ -102,7 +104,8 @@ class AgentManager {
       cronScheduler,
       bus,
       agentManager: this,
-      mcp
+      mcp,
+      isSubagent: !!isSubagent
     };
 
     await skills.loadToolsFromDirectory(toolsDir, runtimeContext);
@@ -136,6 +139,7 @@ class AgentManager {
       systemPromptInterval,
       this.config
     );
+    agentLoop.channel = channel;
     const onToken =
       (channel === "console" || channel === "whatsapp") && !isSubagent
         ? (token, attempt = 1) => {
@@ -147,16 +151,17 @@ class AgentManager {
       actualTaskDescription,
       sessionId,
       userId,
-      skills.getSkillsContext(skillsConfig.fullContent === true),
-      mcp.getMCPContext(),
-      onToken
+      noContext ? "" : skills.getSkillsContext(skillsConfig.fullContent === true),
+      noContext ? "" : mcp.getMCPContext(),
+      onToken,
+      noContext
     );
     const responseContent =
       typeof result.content === "string"
         ? result.content
         : JSON.stringify(result.content);
 
-    if (!isSubagent) {
+    if (!isSubagent && !noContext) {
       await memory.addMessage(sessionId, "user", taskDescription);
       await memory.addMessage(sessionId, "assistant", responseContent);
     }

@@ -94,10 +94,11 @@ Return ONLY this formatted block. Do not include any greeting or explanation.`
     user_id,
     skillsContext = "",
     mcpContext = "",
-    onToken = null
+    onToken = null,
+    noContext = false
   ) {
     this.isRunning = true;
-    bus.emit("task:start", { sessionId: session_id, userId: user_id });
+    bus.emit("task:start", { sessionId: session_id, userId: user_id, channel: this.channel });
     const tokenUsage = { promptTokens: 0, completionTokens: 0 };
     let activeSkill = null;
     let reviewCount = 0;
@@ -138,7 +139,7 @@ Return ONLY this formatted block. Do not include any greeting or explanation.`
     try {
       // Phase 2: In-Session Compaction Check
       try {
-        if (this.memory && typeof this.memory.getRecentContext === "function") {
+        if (!noContext && this.memory && typeof this.memory.getRecentContext === "function") {
           const compactionThreshold = this.config.agents?.defaults?.compactionThreshold ?? 20000;
           const compactionKeepCount = this.config.agents?.defaults?.compactionKeepCount ?? 6;
 
@@ -163,7 +164,8 @@ Return ONLY this formatted block. Do not include any greeting or explanation.`
         session_id,
         user_id,
         skillsContext,
-        mcpContext
+        mcpContext,
+        noContext
       );
 
       // Phase 3: Pre-execution warnings for tool failures
@@ -220,7 +222,7 @@ Return ONLY this formatted block. Do not include any greeting or explanation.`
 
         if (!response.tool_calls || response.tool_calls.length === 0) {
           // Phase 5: Self-Review Critic Loop
-          const selfReviewEnabled = this.config.agents?.defaults?.selfReview ?? true;
+          const selfReviewEnabled = !noContext && (this.config.agents?.defaults?.selfReview ?? true);
           if (selfReviewEnabled && reviewCount < 2) {
             reviewCount++;
             console.log(`\x1b[36m[Self-Review] Initiating final answer review (Attempt ${reviewCount}/2)...\x1b[0m`);
@@ -303,7 +305,8 @@ Be strict. Do not accept placeholders, unfinished code, or skipped steps.`
             name: toolCall.function.name,
             args: toolCall.function.arguments,
             sessionId: session_id,
-            userId: user_id
+            userId: user_id,
+            channel: this.channel
           });
 
           let result;
@@ -407,7 +410,7 @@ Original tool response: ${contentValue}`;
       throw error;
     } finally {
       this.isRunning = false;
-      bus.emit("task:end", { sessionId: session_id, userId: user_id });
+      bus.emit("task:end", { sessionId: session_id, userId: user_id, channel: this.channel });
     }
   }
 }

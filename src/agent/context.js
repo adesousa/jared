@@ -7,12 +7,14 @@ class ContextManager {
     memoryManager,
     soulPath,
     isTeamRole = false,
-    securityConfig = {}
+    securityConfig = {},
+    isSubagent = false
   ) {
     this.memoryManager = memoryManager;
     this.soulPath = soulPath;
     this.isTeamRole = isTeamRole;
     this.securityConfig = securityConfig;
+    this.isSubagent = isSubagent;
     this.soulCache = null;
     this.templateCache = new Map();
   }
@@ -66,6 +68,9 @@ class ContextManager {
     return this.soulCache;
   }
   async getTeamContext() {
+    if (this.isSubagent) {
+      return "";
+    }
     try {
       const teamDir = path.join(process.cwd(), "src", "team");
       const files = await fs.readdir(teamDir);
@@ -83,8 +88,19 @@ class ContextManager {
     session_id,
     user_id,
     skillsContext = "",
-    mcpContext = ""
+    mcpContext = "",
+    noContext = false
   ) {
+    if (noContext) {
+      const minimalSystemPrompt = `You are a helpful and concise assistant. You can use tools to complete the requested task.
+## Current System Time
+The current local date and time is: ${new Date().toLocaleString()}`;
+      return [
+        { role: "system", content: minimalSystemPrompt },
+        { role: "user", content: taskRequest }
+      ];
+    }
+
     const soulTemplate = await this.loadSoul();
     const coreMemories = await this.memoryManager.getCoreMemories(user_id);
     const teamContext = await this.getTeamContext();
@@ -122,12 +138,11 @@ Proceed with the tasks efficiently.
     `.trim();
     logger.debug(`System Prompt:\n${systemPrompt}`);
     const history = await this.memoryManager.getRecentContext(session_id);
-    const messages = [
+    return [
       { role: "system", content: systemPrompt },
       ...history,
       { role: "user", content: taskRequest }
     ];
-    return messages;
   }
 }
 export default ContextManager;

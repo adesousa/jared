@@ -8,10 +8,15 @@ class ConfigManager {
     this.config = {};
   }
   async load() {
-    try { this.config = JSON.parse(await fs.readFile(this.configPath, "utf8")); } catch (err) {
+    let loaded = {};
+    try {
+      loaded = JSON.parse(await fs.readFile(this.configPath, "utf8"));
+    } catch (err) {
       if (err.code !== "ENOENT") { throw new Error(`Failed to read config: ${err.message}`); }
       await fs.mkdir(path.dirname(this.configPath), { recursive: true });
-      this.config = this._getDefaults();
+    }
+    this.config = this._deepMerge(this._getDefaults(), loaded);
+    if (Object.keys(loaded).length === 0) {
       await this._save();
     }
     this.config.projectName = this.projectName;
@@ -54,7 +59,7 @@ class ConfigManager {
         discord: { enabled: false, token: "" },
         slack: { enabled: false, botToken: "", appToken: "" },
         telegram: { enabled: false, token: "" },
-        whatsapp: { enabled: false }
+        whatsapp: { enabled: false, selfChatOnly: true }
       },
       security: {
         restrictToWorkspace: false, workspaceDir: `.jared/${this.projectName}/workspace`,

@@ -105,7 +105,13 @@ class SkillsManager {
       const { module } = result;
       const toolsToLoad = Array.isArray(module.default) ? module.default : [module.default];
       for (const t of toolsToLoad) {
-        if (t && t.schema && t.execute) { this.registerTool(t.schema, (args) => t.execute(args, runtimeContext)); loadedCount++; }
+        if (t && t.schema && t.execute) {
+          if (runtimeContext.isSubagent && ["spawn", "cron", "auto_improve"].includes(t.schema.name)) {
+            continue;
+          }
+          this.registerTool(t.schema, (args) => t.execute(args, runtimeContext));
+          loadedCount++;
+        }
       }
     }
   }

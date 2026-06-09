@@ -9,3 +9,4 @@ export const logger = {
   debug: (...args) => { if (_debug) { console.debug(`[DEBUG] [${new Date().toISOString()}]`, ...args); } } };
 export function setDebug(enabled) { _debug = !!enabled; }
 export function isDebug() { return _debug; }
+export * from "./markdown.js";

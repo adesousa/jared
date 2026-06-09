@@ -2,261 +2,9 @@ import pkg from "whatsapp-web.js";
 const { Client, LocalAuth } = pkg;
 import bus from "../bus/index.js";
 import sessionManager from "../session/index.js";
-import { logger } from "../utils/index.js";
-
-// Helper functions for WhatsApp-specific Markdown and Table formatting
-function stripLinks(cell) {
-  let result = "";
-  let i = 0;
-  while (i < cell.length) {
-    if (cell[i] === '[') {
-      let closeBrackIndex = cell.indexOf(']', i);
-      if (closeBrackIndex !== -1 && cell[closeBrackIndex + 1] === '(') {
-        let closeParenIndex = -1;
-        let parenCount = 1;
-        for (let p = closeBrackIndex + 2; p < cell.length; p++) {
-           if (cell[p] === '(') parenCount++;
-           else if (cell[p] === ')') {
-              parenCount--;
-              if (parenCount === 0) {
-                 closeParenIndex = p;
-                 break;
-              }
-           }
-        }
-        if (closeParenIndex !== -1) {
-           const linkText = cell.slice(i + 1, closeBrackIndex);
-           result += linkText;
-           i = closeParenIndex + 1;
-           continue;
-        }
-      }
-    }
-    result += cell[i];
-    i++;
-  }
-  return result;
-}
-
-function formatWhatsAppLink(text, url) {
-  const cleanText = text.trim().toLowerCase().replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
-  const cleanUrl = url.trim().toLowerCase().replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
-  
-  if (cleanText === cleanUrl || cleanText === "" || url.includes(text)) {
-    return url;
-  }
-  return `${text} (${url})`;
-}
-
-function formatWhatsAppLinksInText(text) {
-  let result = "";
-  let i = 0;
-  while (i < text.length) {
-    if (text[i] === '[') {
-      let closeBrackIndex = text.indexOf(']', i);
-      if (closeBrackIndex !== -1 && text[closeBrackIndex + 1] === '(') {
-        let closeParenIndex = -1;
-        let parenCount = 1;
-        for (let p = closeBrackIndex + 2; p < text.length; p++) {
-           if (cell => false) {} // dummy check, not needed
-           if (text[p] === '(') parenCount++;
-           else if (text[p] === ')') {
-              parenCount--;
-              if (parenCount === 0) {
-                 closeParenIndex = p;
-                 break;
-              }
-           }
-        }
-        if (closeParenIndex !== -1) {
-           const linkText = text.slice(i + 1, closeBrackIndex);
-           const linkUrl = text.slice(closeBrackIndex + 2, closeParenIndex);
-           result += formatWhatsAppLink(linkText, linkUrl);
-           i = closeParenIndex + 1;
-           continue;
-        }
-      }
-    }
-    result += text[i];
-    i++;
-  }
-  return result;
-}
-
-function formatTableToMonospace(lines) {
-  const rows = [];
-  let maxCols = 0;
-  const linksCollected = [];
-
-  for (const line of lines) {
-    let trimmed = line.trim();
-    if (trimmed.startsWith("|")) trimmed = trimmed.substring(1);
-    if (trimmed.endsWith("|")) trimmed = trimmed.substring(0, trimmed.length - 1);
-    const cells = trimmed.split("|").map(c => c.trim());
-    maxCols = Math.max(maxCols, cells.length);
-    rows.push({ cells });
-  }
-
-  // Collect links
-  for (const row of rows) {
-    for (const cell of row.cells) {
-      let i = 0;
-      while (i < cell.length) {
-        if (cell[i] === '[') {
-          let closeBrackIndex = cell.indexOf(']', i);
-          if (closeBrackIndex !== -1 && cell[closeBrackIndex + 1] === '(') {
-            let closeParenIndex = -1;
-            let parenCount = 1;
-            for (let p = closeBrackIndex + 2; p < cell.length; p++) {
-               if (cell[p] === '(') parenCount++;
-               else if (cell[p] === ')') {
-                  parenCount--;
-                  if (parenCount === 0) {
-                     closeParenIndex = p;
-                     break;
-                  }
-               }
-            }
-            if (closeParenIndex !== -1) {
-               const linkText = cell.slice(i + 1, closeBrackIndex);
-               const linkUrl = cell.slice(closeBrackIndex + 2, closeParenIndex);
-               if (!linksCollected.some(l => l.url === linkUrl)) {
-                 linksCollected.push({ text: linkText, url: linkUrl });
-               }
-               i = closeParenIndex + 1;
-               continue;
-            }
-          }
-        }
-        i++;
-      }
-    }
-  }
-
-  let hasSeparator = false;
-  if (rows.length > 1) {
-    hasSeparator = rows[1].cells.every(c => /^[-: ]+$/.test(c) && c.length > 0);
-  }
-
-  const colWidths = new Array(maxCols).fill(0);
-  for (let i = 0; i < rows.length; i++) {
-    if (hasSeparator && i === 1) continue;
-    for (let j = 0; j < rows[i].cells.length; j++) {
-      let cell = rows[i].cells[j] || "";
-      let cleanCell = stripLinks(cell).replace(/\*\*|\*|`/g, "");
-      colWidths[j] = Math.max(colWidths[j] || 0, cleanCell.length);
-    }
-  }
-
-  let resultParts = [];
-  let top = "┌" + colWidths.map(w => "─".repeat(w + 2)).join("┬") + "┐\n";
-  resultParts.push(top);
-
-  const prefix = "│ ";
-  const separator = " │ ";
-  const suffix = " │\n";
-  const sepBorder = "├" + colWidths.map(w => "─".repeat(w + 2)).join("┼") + "┤\n";
-
-  for (let i = 0; i < rows.length; i++) {
-    if (hasSeparator && i === 1) {
-      resultParts.push(sepBorder);
-      continue;
-    }
-
-    let rowParts = [prefix];
-    for (let j = 0; j < colWidths.length; j++) {
-      let cell = rows[i].cells[j] || "";
-      let cleanCell = stripLinks(cell).replace(/\*\*|\*|`/g, "");
-      let visibleLen = cleanCell.length;
-      let padLen = Math.max(0, colWidths[j] - visibleLen);
-
-      rowParts.push(cleanCell);
-      if (padLen > 0) rowParts.push(" ".repeat(padLen));
-
-      if (j < colWidths.length - 1) {
-        rowParts.push(separator);
-      } else {
-        rowParts.push(suffix);
-      }
-    }
-    resultParts.push(rowParts.join(""));
-  }
-
-  let bottom = "└" + colWidths.map(w => "─".repeat(w + 2)).join("┴") + "┘";
-  resultParts.push(bottom);
-
-  let output = "```\n" + resultParts.join("") + "\n```";
-  
-  if (linksCollected.length > 0) {
-    output += "\n\n**Links & Sources:**\n" + linksCollected.map(l => `• **${l.text}**: ${l.url}`).join("\n");
-  }
-
-  return output;
-}
-
-function formatWhatsAppMarkdown(text) {
-  if (!text) return text;
-  let lines = text.split("\n");
-  let formattedLines = [];
-  let inTable = false;
-  let tableLines = [];
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const trimmed = line.trim();
-
-    if (trimmed.startsWith("|")) {
-      inTable = true;
-      tableLines.push(line);
-      continue;
-    } else {
-      if (inTable) {
-        formattedLines.push(formatTableToMonospace(tableLines));
-        tableLines = [];
-        inTable = false;
-      }
-    }
-
-    const headerMatch = line.match(/^(#{1,6})\s+(.*)$/);
-    if (headerMatch) {
-      const hashes = headerMatch[1].length;
-      const title = headerMatch[2];
-      formattedLines.push(`**${"■".repeat(hashes)} ${title}**`);
-      continue;
-    }
-
-    const listMatch = line.match(/^(\s*)([-*])\s+(.*)$/);
-    if (listMatch) {
-      const indent = listMatch[1];
-      const content = listMatch[3];
-      formattedLines.push(`${indent}• ${content}`);
-      continue;
-    }
-
-    formattedLines.push(line);
-  }
-
-  if (inTable) {
-    formattedLines.push(formatTableToMonospace(tableLines));
-  }
-
-  let result = formattedLines.join("\n");
-
-  // Format links
-  result = formatWhatsAppLinksInText(result);
-
-  // Italic: *text* (not next to another *) -> _text_
-  result = result.replace(/(?<!\*)\*(?!\*)(.*?)(?<!\*)\*(?!\*)/g, "_$1_");
-
-  // Bold: **text** -> *text*
-  result = result.replace(/\*\*(.*?)\*\*/g, "*$1*");
-
-  // Inline code: `code` -> ```code```
-  result = result.replace(/(?<!`)`([^`\n]+)`(?!`)/g, "```$1```");
-
-  return result;
-}
-
+import { logger, formatWhatsAppMarkdown } from "../utils/index.js";
+import qrcode from "qrcode-terminal";
+import path from "node:path";
 
 class SessionState {
   constructor() {
@@ -276,8 +24,12 @@ class SessionState {
 class WhatsAppChannel {
   constructor(config = {}) {
     this.enabled = config.enabled === true;
+    this.selfChatOnly = config.selfChatOnly === true;
+    this.projectName = config.projectName;
+    this.debug = config.debug === true;
     this.client = null;
     this.sessions = new Map();
+    this.sentMessageIds = new Set();
   }
 
   async updateProgressMessage(sessionId) {
@@ -319,17 +71,19 @@ class WhatsAppChannel {
       session.lastEditTime = Date.now();
       
       const formatted = formatWhatsAppMarkdown(session.streamText);
+      const streamContent = `*🤖 Jared is typing...*\n\n${formatted || "..."}`;
       if (!session.streamMsg) {
         try {
           if (session.lastUserMsg) {
-            session.streamMsg = await session.lastUserMsg.reply(formatted || "...");
+            session.streamMsg = await session.lastUserMsg.reply(streamContent);
+            this.sentMessageIds.add(session.streamMsg.id.id);
           }
         } catch (e) {
           logger.error("WhatsApp create stream message error:", e);
         }
       } else {
         try {
-          await session.streamMsg.edit(formatted || "...");
+          await session.streamMsg.edit(streamContent);
         } catch (e) {
           logger.error("WhatsApp edit stream message error:", e);
         }
@@ -345,22 +99,80 @@ class WhatsAppChannel {
 
   start() {
     if (!this.enabled) return;
-    this.client = new Client({ authStrategy: new LocalAuth() });
+    
+    const authPath = this.projectName
+      ? path.join(process.cwd(), ".jared", this.projectName, ".wwebjs_auth")
+      : path.join(process.cwd(), ".jared", ".wwebjs_auth");
+      
+    const cachePath = this.projectName
+      ? path.join(process.cwd(), ".jared", this.projectName, ".wwebjs_cache")
+      : path.join(process.cwd(), ".jared", ".wwebjs_cache");
+      
+    this.client = new Client({
+      authStrategy: new LocalAuth({ dataPath: authPath }),
+      webVersionCache: {
+        type: "local",
+        path: cachePath
+      }
+    });
 
     this.client.on("qr", qr => {
-      logger.info(
-        "WhatsApp QR generated - please scan! (Use a QR terminal printer logic here)"
-      );
+      logger.info("WhatsApp QR generated - please scan:");
+      qrcode.generate(qr, { small: true });
     });
 
     this.client.on("ready", () => {
       logger.info("WhatsApp channel connected!");
     });
 
-    this.client.on("message", async msg => {
+    this.client.on("message_create", async msg => {
       if (msg.from === "status@broadcast") return;
       
-      const sessionId = sessionManager.getSessionId("whatsapp", msg.from);
+      // Ignore automated messages generated by Jared to prevent infinite self-chat loops
+      if (msg.body) {
+        const body = msg.body;
+        if (body.startsWith("⏳ *Jared") || 
+            body.startsWith("✅ *Jared") || 
+            body.startsWith("*🤖 Jared") || 
+            body.startsWith("🤖 Jared") || 
+            body.startsWith("🔒 *[EXEC GUARD]*")) {
+          return;
+        }
+      }
+
+      if (this.sentMessageIds.has(msg.id.id)) {
+        this.sentMessageIds.delete(msg.id.id);
+        return;
+      }
+      
+      const myJID = this.client.info?.wid?._serialized;
+      const chatJID = msg.fromMe ? msg.to : msg.from;
+      if (this.debug) {
+        logger.info(`[WhatsApp Debug] msg.fromMe=${msg.fromMe}, msg.from=${msg.from}, msg.to=${msg.to}, chatJID=${chatJID}, myJID=${myJID}`);
+      }
+      
+      let isSelfChat = false;
+      try {
+        const contact = await this.client.getContactById(chatJID);
+        isSelfChat = contact.isMe === true;
+
+        if (!isSelfChat && this.client.pupPage) {
+          isSelfChat = await this.client.pupPage.evaluate((jid) => {
+            const mePn = window.Store.User.getMaybeMePnUser();
+            const meLid = window.Store.User.getMaybeMeLidUser();
+            const pnStr = mePn ? (mePn._serialized || mePn.toString()) : null;
+            const lidStr = meLid ? (meLid._serialized || meLid.toString()) : null;
+            return jid === pnStr || jid === lidStr;
+          }, chatJID);
+        }
+      } catch (err) {
+        logger.error("Error checking contact identity:", err);
+      }
+
+      if (this.selfChatOnly && !isSelfChat) return;
+      if (msg.fromMe && !isSelfChat) return;
+      
+      const sessionId = sessionManager.getSessionId("whatsapp", chatJID);
       let session = this.sessions.get(sessionId);
       if (!session) {
         session = new SessionState();
@@ -377,7 +189,7 @@ class WhatsAppChannel {
 
       bus.emit("message:received", {
         channel: "whatsapp",
-        userId: msg.from,
+        userId: chatJID,
         sessionId: sessionId,
         content: msg.body,
         meta: { msgObject: msg }
@@ -416,6 +228,7 @@ class WhatsAppChannel {
           
           session.toolsRun = [];
           const msg = await session.lastUserMsg.reply("⏳ *Jared is starting...*");
+          this.sentMessageIds.add(msg.id.id);
           session.statusMsg = msg;
         } catch (e) {
           logger.error("WhatsApp task:start error:", e);
@@ -512,10 +325,12 @@ class WhatsAppChannel {
             session.streamText = "";
           } else {
             if (payload.meta?.msgObject) {
-              await payload.meta.msgObject.reply(fullMsg);
+              const sent = await payload.meta.msgObject.reply(fullMsg);
+              this.sentMessageIds.add(sent.id.id);
             } else if (this.client) {
               // Fallback to sending to user ID if msgObject is not available
-              await this.client.sendMessage(payload.userId, fullMsg);
+              const sent = await this.client.sendMessage(payload.userId, fullMsg);
+              this.sentMessageIds.add(sent.id.id);
             }
           }
         } catch (e) {
@@ -535,9 +350,11 @@ class WhatsAppChannel {
             const formattedPrompt = `🔒 *[EXEC GUARD]*\n${cleanPrompt}`;
             
             if (session.lastUserMsg) {
-              await session.lastUserMsg.reply(formattedPrompt);
+              const sent = await session.lastUserMsg.reply(formattedPrompt);
+              this.sentMessageIds.add(sent.id.id);
             } else if (this.client) {
-              await this.client.sendMessage(payload.userId, formattedPrompt);
+              const sent = await this.client.sendMessage(payload.userId, formattedPrompt);
+              this.sentMessageIds.add(sent.id.id);
             }
             
             session.pendingQuestion = payload.callback;
@@ -549,9 +366,22 @@ class WhatsAppChannel {
       }
     });
 
-    this.client.initialize();
+    this.client.initialize().catch(err => {
+      logger.error("WhatsApp failed to initialize:", err);
+    });
+  }
+
+  async stop() {
+    if (this.client) {
+      try {
+        await this.client.destroy();
+        logger.info("WhatsApp client destroyed successfully.");
+      } catch (err) {
+        logger.error("Error destroying WhatsApp client:", err);
+      }
+    }
   }
 }
 
-export { formatWhatsAppMarkdown, formatTableToMonospace };
+export { formatWhatsAppMarkdown };
 export default WhatsAppChannel;

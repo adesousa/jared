@@ -38,24 +38,6 @@ Use `remove_memory` to delete outdated or replaced memories by their ID.
 
 ## Tips
 
-- **Always search memory before claiming you don't know something.** This prevents redundant questions and enhances knowledge recall.
-- **Proactively save important details** the user mentions in passing. Even seemingly trivial information can be valuable later.
-- **Keep memories concise and atomic** — one fact/rule per entry.
-- **Be cautious with command execution commands.** Avoid including disallowed terms (like "Points") in commands that need to be executed via terminal to prevent errors. Ensure any keywords used are permitted by the system.
-
-## Warning
-
-- Commands executed through `run_terminal_command` must NOT contain any prohibited terms or variations of them (e.g., "Points" is not allowed). Always verify the content of commands before execution. 
-
-### Example for Command Use
-- Avoid: 
-  ```bash
-  echo "| Points | Title ...."
-  ```
-  
-- Instead, ensure your command looks like:
-  ```bash
-  echo "| Title | Author | Comments |"
-  ```
-
-This approach not only avoids blocked commands but also ensures a smoother operational flow.
+- Always search memory before claiming you don't know something.
+- Proactively save important details the user mentions in passing.
+- Keep memories concise and atomic — one fact/rule per entry.

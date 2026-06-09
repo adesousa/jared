@@ -175,11 +175,14 @@ Requires **Node.js ≥18**.
 {
   "channels": {
     "whatsapp": {
-      "enabled": true
+      "enabled": true,
+      "selfChatOnly": true
     }
   }
 }
 ```
+
+*Note*: If `"selfChatOnly": true` is set (recommended when linking your personal account), Jared will only reply when you message yourself in your own personal chat context ("Message Yourself"), completely ignoring incoming messages from friends or group chats.
 
 **2. Run** and scan the QR code with WhatsApp → Settings → Linked Devices
 
@@ -326,6 +329,22 @@ To specify which model should be called when using a provider's flag, add a `def
   }
 }
 ```
+
+### Bypass Context (`--nocontext`)
+
+For simple, stateless queries that do not require conversational history or the agent's custom persona context (like simple translations, mathematical equations, or general questions), you can append `--nocontext` to your message. 
+
+When this flag is used:
+- **No System Bloat**: The agent skips loading the heavy system prompt templates (such as the persona rules in `SOUL.md`, workspace layout, and skill documents). Instead, a lightweight prompt is sent.
+- **No Conversation History**: Prior context/messages in the current session are ignored.
+- **No History Pollution**: The interaction is not saved to the SQLite conversation database.
+- **Fast Execution**: Bypasses the multi-turn self-critic / review loop.
+- **Tools are still registered**: Built-in and MCP tools remain available, allowing the LLM to write files, run command line scripts, or search the web if the simple task requires it.
+
+**Example usage:**
+- `Translate "good morning" into Spanish --nocontext`
+- `What is 123 * 456? --nocontext`
+- `Write the current system time to a file named time.txt --nocontext`
 
 ### Channels
 

@@ -126,3 +126,43 @@ test("ContextManager buildPrompt with no facts shows placeholder", async () => {
 
   fs.rmSync(dir, { recursive: true });
 });
+
+test("ContextManager buildPrompt with noContext flag", async () => {
+  const dir = tmpDir();
+  const dbPath = path.join(dir, "memory.db");
+  const memory = new MemoryManager(dbPath);
+  await memory.initialize();
+  await memory.addMessage("session1", "user", "Previous context question");
+
+  const ctx = new ContextManager(memory, path.join(dir, "SOUL.md"));
+  const messages = await ctx.buildPrompt("Hello with no context", "session1", "user1", "", "", true);
+
+  assert.strictEqual(messages.length, 2); // only system + user
+  const roles = messages.map(m => m.role);
+  assert.strictEqual(roles[0], "system");
+  assert.strictEqual(roles[1], "user");
+  assert.strictEqual(messages[1].content, "Hello with no context");
+  assert.ok(messages[0].content.includes("helpful and concise assistant"));
+  assert.ok(messages[0].content.includes("Current System Time"));
+
+  fs.rmSync(dir, { recursive: true });
+});
+
+test("ContextManager buildPrompt for subagent does not include TEAM context", async () => {
+  const dir = tmpDir();
+  const dbPath = path.join(dir, "memory.db");
+  const memory = new MemoryManager(dbPath);
+  await memory.initialize();
+
+  // Create ContextManager with isSubagent = true
+  const ctx = new ContextManager(memory, path.join(dir, "SOUL.md"), false, {}, true);
+  const messages = await ctx.buildPrompt("Hello subagent", "session1", "user1");
+
+  const systemMsg = messages.find(m => m.role === "system");
+  assert.ok(systemMsg);
+  // It shouldn't contain the Available Team Members header
+  assert.ok(!systemMsg.content.includes("Available Team Members"));
+
+  fs.rmSync(dir, { recursive: true });
+});
+

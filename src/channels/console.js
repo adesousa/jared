@@ -1,7 +1,7 @@
 import readline from "node:readline";
 import bus from "../bus/index.js";
 import sessionManager from "../session/index.js";
-import { logger } from "../utils/index.js";
+import { logger, formatLinks, formatMarkdownTable } from "../utils/index.js";
 const PURPLE = "\x1b[38;5;141m";
 const WHITE = "\x1b[97m";
 const GREEN = "\x1b[32m";
@@ -11,72 +11,6 @@ const BOLD = "\x1b[1m";
 const YELLOW = "\x1b[33m";
 const CYAN = "\x1b[36m";
 const BANNER = `${PURPLE}${BOLD}\n     ██╗ █████╗ ██████╗ ███████╗██████╗ \n     ██║██╔══██╗██╔══██╗██╔════╝██╔══██╗\n     ██║███████║██████╔╝█████╗  ██║  ██║\n██   ██║██╔══██║██╔══██╗██╔══╝  ██║  ██║\n╚█████╔╝██║  ██║██║  ██║███████╗██████╔╝\n ╚════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═════╝ \n${RESET}${DIM}  Your AI COO · Type "exit" to quit${RESET}\n`;
-function stripLinks(cell) {
-  let result = "";
-  let i = 0;
-  while (i < cell.length) {
-    if (cell[i] === '[') {
-      let closeBrackIndex = cell.indexOf(']', i);
-      if (closeBrackIndex !== -1 && cell[closeBrackIndex + 1] === '(') {
-        let closeParenIndex = -1;
-        let parenCount = 1;
-        for (let p = closeBrackIndex + 2; p < cell.length; p++) {
-           if (cell[p] === '(') parenCount++;
-           else if (cell[p] === ')') {
-              parenCount--;
-              if (parenCount === 0) {
-                 closeParenIndex = p;
-                 break;
-              }
-           }
-        }
-        if (closeParenIndex !== -1) {
-           const linkText = cell.slice(i + 1, closeBrackIndex);
-           result += linkText;
-           i = closeParenIndex + 1;
-           continue;
-        }
-      }
-    }
-    result += cell[i];
-    i++;
-  }
-  return result;
-}
-
-function formatCellLinks(cell, formatLinkFn) {
-  let result = "";
-  let i = 0;
-  while (i < cell.length) {
-    if (cell[i] === '[') {
-      let closeBrackIndex = cell.indexOf(']', i);
-      if (closeBrackIndex !== -1 && cell[closeBrackIndex + 1] === '(') {
-        let closeParenIndex = -1;
-        let parenCount = 1;
-        for (let p = closeBrackIndex + 2; p < cell.length; p++) {
-           if (cell[p] === '(') parenCount++;
-           else if (cell[p] === ')') {
-              parenCount--;
-              if (parenCount === 0) {
-                 closeParenIndex = p;
-                 break;
-              }
-           }
-        }
-        if (closeParenIndex !== -1) {
-           const linkText = cell.slice(i + 1, closeBrackIndex);
-           const linkUrl = cell.slice(closeBrackIndex + 2, closeParenIndex);
-           result += formatLinkFn(linkText, linkUrl);
-           i = closeParenIndex + 1;
-           continue;
-        }
-      }
-    }
-    result += cell[i];
-    i++;
-  }
-  return result;
-}
 
 class StreamMarkdownLexer {
   constructor(writeFn) {
@@ -322,79 +256,31 @@ class StreamMarkdownLexer {
     }
   }
   formatTable(lines) {
-     const rows = [];
-     let maxCols = 0;
-     for (const line of lines) {
-        let trimmed = line.trim();
-        if (trimmed.startsWith('|')) trimmed = trimmed.substring(1);
-        if (trimmed.endsWith('|')) trimmed = trimmed.substring(0, trimmed.length - 1);
-        const cells = trimmed.split('|').map(c => c.trim());
-        maxCols = Math.max(maxCols, cells.length);
-        rows.push({ original: line, cells });
-     }
-     let hasSeparator = false;
-     if (rows.length > 1) { hasSeparator = rows[1].cells.every(c => /^[-: ]+$/.test(c) && c.length > 0); }
-     const colWidths = new Array(maxCols).fill(0);
-     for (let i = 0; i < rows.length; i++) {
-        if (hasSeparator && i === 1) continue;
-        for (let j = 0; j < rows[i].cells.length; j++) {
-           let cell = rows[i].cells[j];
-           let cleanCell = stripLinks(cell).replace(/\*\*|\*|`/g, '');
-           colWidths[j] = Math.max(colWidths[j] || 0, cleanCell.length);
-        }
-     }
+    const bold = this.fmt.bold;
+    const stateFmt = this.getStateFmt();
+    const italic = this.fmt.italic;
+    const cyan = this.fmt.cyan;
 
-     let resultParts = [];
-     let top = this.fmt.dim + "┌" + colWidths.map(w => "─".repeat(w + 2)).join("┬") + "┐" + this.getStateFmt() + "\n";
-     resultParts.push(top);
-
-     const dim = this.fmt.dim;
-     const stateFmt = this.getStateFmt();
-     const bold = this.fmt.bold;
-     const italic = this.fmt.italic;
-     const cyan = this.fmt.cyan;
-
-     const prefix = dim + "│" + stateFmt + " ";
-     const separator = dim + " │" + stateFmt + " ";
-     const suffix = " " + dim + "│" + stateFmt + "\n";
-     const sepBorder = dim + "├" + colWidths.map(w => "─".repeat(w + 2)).join("┼") + "┤" + stateFmt + "\n";
-
-     for (let i = 0; i < rows.length; i++) {
-        if (hasSeparator && i === 1) {
-           resultParts.push(sepBorder);
-           continue;
-        }
-
-        let rowParts = [prefix];
-        for (let j = 0; j < colWidths.length; j++) {
-           let cell = rows[i].cells[j] || "";
-           let cleanCell = stripLinks(cell).replace(/\*\*|\*|`/g, '');
-           let visibleLen = cleanCell.length;
-           let padLen = Math.max(0, colWidths[j] - visibleLen);
-           let formattedCell = cell
-              .replace(/\*\*(.*?)\*\*/g, bold + "$1" + stateFmt)
-              .replace(/\*(.*?)\*/g, italic + "$1" + stateFmt)
-              .replace(/`(.*?)`/g, cyan + "$1" + stateFmt);
-           
-           formattedCell = formatCellLinks(formattedCell, (text, url) => {
-              return this.formatLink(text, url);
-           });
-              
-           rowParts.push(formattedCell);
-           if (padLen > 0) rowParts.push(" ".repeat(padLen));
-           
-           if (j < colWidths.length - 1) {
-              rowParts.push(separator);
-           } else {
-              rowParts.push(suffix);
-           }
-        }
-        resultParts.push(rowParts.join(""));
-     }
-
-     let bottom = dim + "└" + colWidths.map(w => "─".repeat(w + 2)).join("┴") + "┘" + stateFmt + "\n";
-     resultParts.push(bottom);
-     return resultParts.join("");
+    return formatMarkdownTable(lines, {
+      formatCell: (cell) => {
+        let formattedCell = cell
+          .replace(/\*\*(.*?)\*\*/g, bold + "$1" + stateFmt)
+          .replace(/\*(.*?)\*/g, italic + "$1" + stateFmt)
+          .replace(/`(.*?)`/g, cyan + "$1" + stateFmt);
+        
+        return formatLinks(formattedCell, (text, url) => {
+          return this.formatLink(text, url);
+        });
+      },
+      getBorders: () => ({
+        top: [this.fmt.dim + "┌", "─", "┬", "┐" + this.getStateFmt() + "\n"],
+        middle: [this.fmt.dim + "├", "─", "┼", "┤" + this.getStateFmt() + "\n"],
+        bottom: [this.fmt.dim + "└", "─", "┴", "┘" + this.getStateFmt() + "\n"],
+        prefix: this.fmt.dim + "│" + this.getStateFmt() + " ",
+        separator: this.fmt.dim + " │" + this.getStateFmt() + " ",
+        suffix: " " + this.fmt.dim + "│" + this.getStateFmt() + "\n"
+      })
+    });
   }
 }
 class ConsoleChannel {
@@ -448,9 +334,17 @@ class ConsoleChannel {
     bus.on("subagent:end", payload => {
       if (payload.channel === "console") { this.activeSubagents = Math.max(0, this.activeSubagents - 1); this.updatePrompt(); }
     });
-    bus.on("task:start", () => { console.log(); this.startSpinner("Thinking..."); });
-    bus.on("task:end", () => { this.stopSpinner(); });
+    bus.on("task:start", payload => {
+      if (payload && payload.channel !== "console") return;
+      console.log();
+      this.startSpinner("Thinking...");
+    });
+    bus.on("task:end", payload => {
+      if (payload && payload.channel !== "console") return;
+      this.stopSpinner();
+    });
     bus.on("tool:start", payload => {
+      if (payload && payload.channel !== "console") return;
       this.stopSpinner();
       let toolStr = payload.name;
       try {
@@ -469,7 +363,11 @@ class ConsoleChannel {
       const text = line.trim();
       logger.debug(`Received user input from console: "${text}"`);
       if (!text) { this.rl.prompt(); return; }
-      if (text.toLowerCase() === "exit" || text.toLowerCase() === "quit") { console.log(`\n${DIM}Goodbye.${RESET}\n`); process.exit(0); }
+      if (text.toLowerCase() === "exit" || text.toLowerCase() === "quit") {
+        console.log(`\n${DIM}Goodbye.${RESET}\n`);
+        bus.emit("system:shutdown");
+        return;
+      }
       const sessionId = sessionManager.getSessionId("console", "local_user");
       bus.emit("message:received", {
         channel: "console",
@@ -531,8 +429,12 @@ class ConsoleChannel {
         this.rl.prompt();
       }
     });
-    this.rl.on("close", () => { console.log(`\n${DIM}Goodbye.${RESET}\n`); process.exit(0); });
+    this.rl.on("close", () => {
+      console.log(`\n${DIM}Goodbye.${RESET}\n`);
+      bus.emit("system:shutdown");
+    });
     bus.on("console:question", payload => {
+      if (payload && payload.channel !== "console") return;
       this.stopSpinner();
       payload.handled = true;
       this.rl.question(payload.promptText, answer => {

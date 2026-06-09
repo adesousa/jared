@@ -23,17 +23,14 @@ export default {
     const check = await execGuard.validate(command);
     if (!check.allowed) return { error: check.reason };
     try {
-      const { execFileSync } = await import("node:child_process");
+      const { execSync } = await import("node:child_process");
       const opts = { timeout, encoding: "utf8", maxBuffer: 1024 * 1024 };
       const wsCwd = execGuard.getWorkspaceCwd();
       if (wsCwd) opts.cwd = wsCwd;
 
-      const argsMatch = command.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g);
-      if (!argsMatch) return { error: "Empty command" };
+      if (!command || !command.trim()) return { error: "Empty command" };
 
-      const args = argsMatch.map(s => s.replace(/^["']|["']$/g, ""));
-      const bin = args.shift();
-      return execFileSync(bin, args, opts);
+      return execSync(command, opts);
     } catch (err) {
       return {
         error: err.message,

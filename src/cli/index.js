@@ -223,8 +223,8 @@ async function main() {
           });
           return;
         }
-        if (content.startsWith("/auto-improve")) {
-          const matchTool = content.match(/\/auto-improve\s+(\S+)/);
+        if (content.startsWith("/auto-improve") || content.startsWith("/autoimprove")) {
+          const matchTool = content.match(/\/(?:auto-improve|autoimprove)\s+(\S+)/);
           const targetTool = matchTool ? matchTool[1] : null;
           bus.emit("message:send", {
             channel: payload.channel,
@@ -248,10 +248,18 @@ async function main() {
         const providersKeys = Object.keys(config.providers || {});
         const match = content.match(/--([a-zA-Z0-9_-]+)(?:\s|$)/);
         if (match && providersKeys.includes(match[1])) { providerOverride = match[1]; content = content.replace(match[0], " ").trim(); }
+
+        let noContext = false;
+        if (content.includes("--nocontext")) {
+          noContext = true;
+          content = content.replace(/--nocontext/g, "").replace(/\s+/g, " ").trim();
+        }
+
         const result = await agentManager.spinUp(
           content,
           {
             providerOverride,
+            noContext,
             channel: payload.channel,
             userId: payload.userId,
             sessionId: payload.sessionId
@@ -310,10 +318,31 @@ async function main() {
       slack: SlackChannel,
       whatsapp: WhatsAppChannel
     };
+    const activeChannels = [];
     for (const [name, ChannelClass] of Object.entries(channelMap)) {
       const channelConfig = config.channels?.[name];
-      if (channelConfig?.enabled) { const instance = new ChannelClass(channelConfig); instance.start(); }
+      if (channelConfig?.enabled) {
+        const instance = new ChannelClass({ ...channelConfig, projectName, debug: config.debug });
+        instance.start();
+        activeChannels.push(instance);
+      }
     }
+
+    let cleaningUp = false;
+    const cleanup = async () => {
+      if (cleaningUp) return;
+      cleaningUp = true;
+      for (const instance of activeChannels) {
+        if (typeof instance.stop === "function") {
+          await instance.stop();
+        }
+      }
+      process.exit(0);
+    };
+
+    process.on("SIGINT", cleanup);
+    process.on("SIGTERM", cleanup);
+    bus.on("system:shutdown", cleanup);
   }
 }
 main().catch(err => { console.error("Fatal error:", err); process.exit(1); });
