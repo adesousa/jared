@@ -23,14 +23,26 @@ export default {
     const check = await execGuard.validate(command);
     if (!check.allowed) return { error: check.reason };
     try {
-      const { execSync } = await import("node:child_process");
+      const { exec } = await import("node:child_process");
       const opts = { timeout, encoding: "utf8", maxBuffer: 1024 * 1024 };
       const wsCwd = execGuard.getWorkspaceCwd();
       if (wsCwd) opts.cwd = wsCwd;
 
       if (!command || !command.trim()) return { error: "Empty command" };
 
-      return execSync(command, opts);
+      return await new Promise((resolve) => {
+        exec(command, opts, (error, stdout, stderr) => {
+          if (error) {
+            resolve({
+              error: error.message,
+              stderr: stderr || "",
+              stdout: stdout || ""
+            });
+          } else {
+            resolve(stdout);
+          }
+        });
+      });
     } catch (err) {
       return {
         error: err.message,
