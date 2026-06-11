@@ -202,7 +202,8 @@ async function main() {
     const securityConfig = config.security || {};
     if (securityConfig.restrictToWorkspace) { const workspaceDir = path.resolve(process.cwd(), securityConfig.workspaceDir || `.jared/${projectName}/workspace`); console.log(`[INFO] Workspace restricted to: ${workspaceDir}`); }
     const agentManager = new AgentManager(config);
-    bus.on("message:received", async payload => {
+    const sessionQueues = new Map();
+    const processMessage = async payload => {
       try {
         let content = payload.content.trim();
         if (content.startsWith("/compact")) {
@@ -285,6 +286,18 @@ async function main() {
           meta: payload.meta
         });
       }
+    };
+
+    bus.on("message:received", payload => {
+      const { sessionId } = payload;
+      const existingQueue = sessionQueues.get(sessionId) || Promise.resolve();
+      const newQueue = existingQueue.then(() => processMessage(payload));
+      sessionQueues.set(sessionId, newQueue);
+      newQueue.then(() => {
+        if (sessionQueues.get(sessionId) === newQueue) {
+          sessionQueues.delete(sessionId);
+        }
+      });
     });
     bus.on("cron:trigger", async ({ tasks }) => {
       const prompt = `[System Trigger] The following scheduled tasks are due NOW:\n${tasks.map(t => `- ${t}`).join("\n")}\n\nYour job is to strictly perform the action or immediately remind the user. Do not schedule them again using tools.`;
