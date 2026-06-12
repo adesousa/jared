@@ -302,13 +302,31 @@ async function main() {
       });
     });
     bus.on("cron:trigger", async ({ tasks }) => {
-      const prompt = `[System Trigger] The following scheduled tasks are due NOW:\n${tasks.map(t => `- ${t}`).join("\n")}\n\nYour job is to strictly perform the action or immediately remind the user. Do not schedule them again using tools.`;
+      let providerOverride = null;
+      let noContext = false;
+      const providersKeys = Object.keys(config.providers || {});
+      const cleanedTasks = tasks.map(task => {
+        let cleaned = task;
+        const match = cleaned.match(/--([a-zA-Z0-9_-]+)(?:\s|$)/);
+        if (match && providersKeys.includes(match[1])) {
+          providerOverride = match[1];
+          cleaned = cleaned.replace(match[0], " ").trim();
+        }
+        if (cleaned.includes("--nocontext")) {
+          noContext = true;
+          cleaned = cleaned.replace(/--nocontext/g, "").replace(/\s+/g, " ").trim();
+        }
+        return cleaned;
+      });
+
+      const prompt = `[System Trigger] The following scheduled tasks are due NOW:\n${cleanedTasks.map(t => `- ${t}`).join("\n")}\n\nYour job is to strictly perform the action or immediately remind the user. Do not schedule them again using tools.`;
       try {
         const cronSessionId = sessionManager.getSessionId("cron", "system");
         const result = await agentManager.spinUp(
           prompt,
           {
-            providerOverride: null,
+            providerOverride,
+            noContext,
             channel: "cron",
             userId: "system",
             sessionId: cronSessionId
