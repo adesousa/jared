@@ -12,6 +12,7 @@ import WhatsAppChannel from "../channels/whatsapp.js";
 import bus from "../bus/index.js";
 import { logger, setDebug } from "../utils/index.js";
 import cronScheduler from "../cron/index.js";
+import sessionManager from "../session/index.js";
 async function main() {
   const args = process.argv.slice(2);
   const options = { help: { type: "boolean", short: "h" } };
@@ -198,6 +199,7 @@ async function main() {
     console.log(`  ${G}✓${R} Scheduler: Backlog Synced`);
     console.log(`  ${G}✓${R} Skills: ${startupSkills.skillInstructions.length} | Tools: ${startupSkills.tools.length}\n`);
     setDebug(config.debug === true);
+    sessionManager.configure(config);
     cronScheduler.start(projectName);
     const securityConfig = config.security || {};
     if (securityConfig.restrictToWorkspace) { const workspaceDir = path.resolve(process.cwd(), securityConfig.workspaceDir || `.jared/${projectName}/workspace`); console.log(`[INFO] Workspace restricted to: ${workspaceDir}`); }
@@ -302,25 +304,29 @@ async function main() {
     bus.on("cron:trigger", async ({ tasks }) => {
       const prompt = `[System Trigger] The following scheduled tasks are due NOW:\n${tasks.map(t => `- ${t}`).join("\n")}\n\nYour job is to strictly perform the action or immediately remind the user. Do not schedule them again using tools.`;
       try {
-        const crypto = await import("node:crypto");
-        const cronSessionId = `cron-${crypto.randomUUID()}`;
+        const cronSessionId = sessionManager.getSessionId("cron", "system");
         const result = await agentManager.spinUp(
           prompt,
           {
             providerOverride: null,
             channel: "cron",
-            userId: "local_user",
+            userId: "system",
             sessionId: cronSessionId
           }
         );
         if (result.content && result.content.trim() !== "") {
           logger.debug(`[Cron] Agent response: ${result.content.substring(0, 100)}...`);
-          bus.emit("message:send", {
-             channel: "console",
-             userId: "system",
-             sessionId: "cron",
-             content: result.content
-          });
+          const enabledChannels = Object.entries(config.channels || {})
+            .filter(([, v]) => v.enabled)
+            .map(([k]) => k);
+          for (const channelName of enabledChannels) {
+            bus.emit("message:send", {
+               channel: channelName,
+               userId: channelName === "console" ? "local_user" : "system",
+               sessionId: cronSessionId,
+               content: result.content
+            });
+          }
         }
       } catch (e) { logger.error("[Cron] Agent error:", e); }
     });

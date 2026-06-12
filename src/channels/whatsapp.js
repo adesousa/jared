@@ -353,11 +353,34 @@ class WhatsAppChannel {
               this.sentMessageIds.add(sent.id.id);
             } else if (this.client) {
               // Fallback to sending to user ID if msgObject is not available
-              const sent = await this.client.sendMessage(
-                payload.userId,
-                fullMsg
-              );
-              this.sentMessageIds.add(sent.id.id);
+              let targetJid = payload.userId;
+              if (targetJid === "system" || targetJid === "local_user" || !targetJid || !targetJid.includes("@")) {
+                if (this.selfChatOnly && this.client.info?.wid?._serialized) {
+                  targetJid = this.client.info.wid._serialized;
+                } else {
+                  // Find the most recent active session
+                  let lastMsgTime = 0;
+                  let fallbackJid = null;
+                  for (const [, sess] of this.sessions.entries()) {
+                    if (sess.lastUserMsg && sess.lastUserMsg.timestamp > lastMsgTime) {
+                      lastMsgTime = sess.lastUserMsg.timestamp;
+                      fallbackJid = sess.lastUserMsg.fromMe ? sess.lastUserMsg.to : sess.lastUserMsg.from;
+                    }
+                  }
+                  if (fallbackJid) {
+                    targetJid = fallbackJid;
+                  }
+                }
+              }
+              if (targetJid && targetJid.includes("@")) {
+                const sent = await this.client.sendMessage(
+                  targetJid,
+                  fullMsg
+                );
+                this.sentMessageIds.add(sent.id.id);
+              } else {
+                logger.error("WhatsApp: No valid recipient JID found for outgoing message.");
+              }
             }
           }
         } catch (e) {
